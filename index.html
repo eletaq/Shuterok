@@ -3,441 +3,1101 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>Shuterok — рабочий прототип</title>
+<title>Shuterok — Движок</title>
 <style>
-  :root{--accent:#4fc3f7; --ui-size:16px;}
-  html,body{height:100%; margin:0; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; background:#000; font-family:system-ui,Segoe UI,Roboto,Arial; overflow:hidden;}
-  #gameWrap{position:relative; height:100vh; width:100vw; overflow:hidden;}
-  canvas{display:block; width:100%; height:100%; background:#111; touch-action:none; cursor:none;}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#000;font-family:monospace;-webkit-user-select:none;user-select:none;touch-action:none}
   
-  #settingsBtn{position:absolute; right:12px; top:12px; z-index:1100; width:44px; height:44px; border-radius:10px; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; color:#fff; border:1px solid rgba(255,255,255,0.06); box-shadow:0 6px 18px rgba(0,0,0,0.5);}
-  #fireBtn{position:absolute; z-index:1050; width:72px; height:72px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow:0 8px 24px rgba(255,84,0,0.28); display:flex; align-items:center; justify-content:center; color:#111; font-weight:700; user-select:none; touch-action:none; font-size:32px; border:2px solid rgba(255,255,255,0.15);}
-  #fireBtn:active{transform:scale(0.88);}
+  #wrap{position:relative;height:100vh;width:100vw;overflow:hidden;background:#000}
+  canvas{display:block;width:100%;height:100%;background:#1a1c20;touch-action:none;cursor:none}
   
-  #settingsOverlay{position:absolute; inset:0; z-index:1200; display:none; align-items:flex-start; justify-content:center; background:rgba(0,0,0,0.45); padding:18px;}
-  #settingsPanel{width:min(96vw,540px); background:#0f1113; color:#e6eef6; border-radius:12px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.6); max-height:90vh; overflow-y:auto;}
-  #settingsPanel h2{margin:4px 0 8px; font-size:18px;}
-  .row{display:flex; gap:10px; align-items:center; margin:8px 0; flex-wrap:wrap;}
-  label{font-size:13px; color:#cfe9ff; display:flex; flex-direction:column; gap:4px; flex:1; min-width:100px;}
-  .range{width:100%;}
-  .btn-row{display:flex; gap:8px; justify-content:flex-end; margin-top:12px;}
-  .btn{padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600;}
-  .btn.ghost{background:transparent; color:#cfe9ff; border:1px solid rgba(255,255,255,0.06);}
-  .btn.primary{background:var(--accent); color:#042; border:none;}
-  #joystickPreview,#firePreview{width:160px; height:160px; background:linear-gradient(180deg,#0b0d0f,#0f1316); border-radius:12px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:none; flex-shrink:0;}
-  #previewPad{position:absolute; inset:12px; border-radius:8px; background:rgba(255,255,255,0.02);}
-  #previewStick{position:absolute; width:48px; height:48px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #9df0ff, #04a6d6); box-shadow:0 6px 20px rgba(4,166,214,0.25); touch-action:none; border:2px solid rgba(255,255,255,0.1);}
-  #previewFire{position:absolute; width:40px; height:40px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow:0 6px 18px rgba(255,84,0,0.18); touch-action:none; border:2px solid rgba(255,255,255,0.1);}
-  .sectionTitle{font-size:13px; color:#9fd9ff; margin-top:6px;}
-  .info{font-size:12px; color:#9fbcd6;}
+  #fireBtn{
+    position:absolute;
+    z-index:100;
+    width:72px;
+    height:72px;
+    border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #ff6b35, #cc0000);
+    box-shadow:0 8px 32px rgba(255,0,0,0.4), inset 0 -4px 12px rgba(0,0,0,0.3);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-weight:900;
+    font-size:12px;
+    border:3px solid rgba(255,255,255,0.15);
+    touch-action:none;
+    transition:transform 0.1s;
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  #fireBtn:active{transform:scale(0.85)}
   
-  #debugOverlay{position:absolute; inset:0; z-index:1300; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); padding:20px;}
-  #debugOverlay.active{display:flex;}
-  #debugPanel{width:min(94vw,600px); max-height:80vh; overflow-y:auto; background:#0a0c0f; color:#b0d0e8; border-radius:16px; padding:16px 20px; border:1px solid rgba(79,195,247,0.15); font-family:'Courier New',monospace; font-size:12px; line-height:1.6;}
-  #debugPanel .header{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.06);}
-  #debugPanel .header h3{color:var(--accent); font-size:16px; margin:0; font-family:system-ui;}
-  #debugPanel .header .close-btn{background:rgba(255,255,255,0.05); border:none; color:#8aaccc; padding:4px 14px; border-radius:8px; cursor:pointer; font-size:14px; font-family:system-ui;}
-  #debugContent .label{color:#4fc3f7; font-weight:600;}
-  #debugContent .value{color:#ffd97a;}
+  #debugBtn{
+    position:absolute;
+    left:12px;
+    top:12px;
+    z-index:100;
+    width:40px;
+    height:40px;
+    border-radius:10px;
+    background:rgba(0,0,0,0.7);
+    backdrop-filter:blur(8px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid rgba(255,255,255,0.08);
+    color:#fff;
+    font-size:18px;
+    transition:transform 0.2s;
+    cursor:pointer;
+  }
+  #debugBtn:active{transform:scale(0.9)}
   
-  @media(max-width:520px){#joystickPreview,#firePreview{width:120px;height:120px;}#settingsPanel{padding:12px;}}
+  #debugOverlay{
+    position:absolute;
+    top:58px;
+    left:12px;
+    z-index:300;
+    display:none;
+    background:rgba(0,0,0,0.92);
+    backdrop-filter:blur(12px);
+    border-radius:10px;
+    border:1px solid rgba(79,195,247,0.15);
+    padding:10px 12px;
+    min-width:160px;
+    max-width:min(340px, 70vw);
+    max-height:60vh;
+    overflow-y:auto;
+    pointer-events:auto;
+    box-shadow:0 8px 32px rgba(0,0,0,0.9);
+    font-size:11px;
+    line-height:1.5;
+    color:#b0d0e8;
+  }
+  #debugOverlay.active{display:block}
+  
+  #debugPanel .head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:5px;
+    padding-bottom:4px;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  #debugPanel .head h3{
+    color:#4fc3f7;
+    font-size:12px;
+    margin:0;
+    font-family:system-ui;
+  }
+  #debugPanel .head button{
+    background:rgba(255,255,255,0.05);
+    border:none;
+    color:#8aaccc;
+    padding:1px 6px;
+    border-radius:4px;
+    cursor:pointer;
+    font-size:10px;
+    font-family:system-ui;
+  }
+  #debugPanel .head button:hover{background:rgba(255,255,255,0.1)}
+  
+  #debugContent .lbl{color:#4fc3f7}
+  #debugContent .val{color:#ffd97a}
+  #debugContent .warn{color:#ffa94d}
+  #debugContent .err{color:#ff6b6b}
+  #debugContent .ok{color:#69db7c}
+  #debugContent .section{
+    color:#fff;
+    font-weight:700;
+    margin-top:5px;
+    display:block;
+    border-top:1px solid rgba(255,255,255,0.04);
+    padding-top:4px;
+  }
+  #debugContent .sub{margin-left:10px;display:block}
+  #debugContent .error-log{
+    background:rgba(255,0,0,0.06);
+    border-left:2px solid #ff6b6b;
+    padding:2px 6px;
+    margin:2px 0;
+    border-radius:3px;
+    font-size:9px;
+  }
+  
+  #hudDebug{
+    position:absolute;
+    bottom:80px;
+    left:12px;
+    z-index:50;
+    color:#0f0;
+    font-family:monospace;
+    font-size:11px;
+    background:rgba(0,0,0,0.7);
+    padding:6px 10px;
+    border-radius:6px;
+    border:1px solid rgba(0,255,0,0.2);
+    pointer-events:none;
+    line-height:1.4;
+    max-width:200px;
+  }
+  #hudDebug .label{color:#4fc3f7}
+  #hudDebug .value{color:#ffd97a}
+  #hudDebug .err{color:#ff6b6b}
+  
+  @media(max-width:600px){
+    #debugOverlay{
+      top:54px;
+      left:8px;
+      padding:8px 10px;
+      min-width:120px;
+      max-width:min(260px, 65vw);
+      max-height:50vh;
+      font-size:10px;
+    }
+    #debugPanel .head h3{font-size:10px}
+    #debugContent .sub{margin-left:6px}
+    #debugBtn{width:34px;height:34px;font-size:16px;left:8px;top:8px}
+    #fireBtn{width:60px;height:60px;font-size:10px}
+    #hudDebug{font-size:9px;padding:4px 8px;bottom:70px;left:8px;max-width:150px}
+  }
+  
+  @media(max-width:400px){
+    #debugOverlay{
+      top:48px;
+      left:6px;
+      padding:6px 8px;
+      min-width:100px;
+      max-width:min(200px, 60vw);
+      max-height:45vh;
+      font-size:9px;
+    }
+    #debugPanel .head h3{font-size:9px}
+    #debugContent .section{margin-top:3px;padding-top:3px}
+    #debugContent .sub{margin-left:4px}
+    #debugBtn{width:30px;height:30px;font-size:14px;left:6px;top:6px}
+    #fireBtn{width:52px;height:52px;font-size:9px}
+    #hudDebug{font-size:8px;padding:3px 6px;bottom:60px;left:6px;max-width:120px}
+  }
 </style>
 </head>
 <body>
-<div id="gameWrap">
-  <canvas id="gameCanvas" playsinline></canvas>
-  <div id="fireBtn" aria-label="Огонь">⚡</div>
-  <div id="settingsBtn" aria-label="Настройки">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 16.9l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.7 0 1.28-.41 1.51-1a1.65 1.65 0 0 0-.33-1.82L4.3 2.3A2 2 0 1 1 7.12.48l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 11.5 0H12a2 2 0 1 1 4 0h.09c.7 0 1.28.41 1.51 1 .13.41.45.76.86.96l.06.02a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82v.09c0 .7.41 1.28 1 1.51H21a2 2 0 1 1 0 4h-.09c-.41 0-.76.45-.96.86z"/>
-    </svg>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  
+  <div id="fireBtn">FIRE</div>
+  <div id="debugBtn">🐛</div>
+  
+  <div id="hudDebug">
+    <span class="label">Дист:</span> <span class="value" id="debugDist">0.00</span><br>
+    <span class="label">Клетка:</span> <span class="value" id="debugCell">-</span>
   </div>
-  <div id="settingsOverlay">
-    <div id="settingsPanel">
-      <h2>Настройки</h2>
-      <div class="sectionTitle">Джойстик (сенсор)</div>
-      <div class="row">
-        <div id="joystickPreview"><div id="previewPad"></div><div id="previewStick"></div></div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
-          <label>Масштаб стика <input id="joyScale" class="range" type="range" min="0.6" max="1.6" step="0.05"></label>
-          <label>Размер области <input id="joySize" class="range" type="range" min="0.12" max="0.45" step="0.01"></label>
-          <div class="info">Перетащите кружок в превью</div>
-        </div>
-      </div>
-      <div class="sectionTitle">Кнопка огня</div>
-      <div class="row">
-        <div id="firePreview"><div id="previewPadFire"></div><div id="previewFire"></div></div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
-          <label>Размер <input id="fireSize" class="range" type="range" min="36" max="110" step="2"></label>
-          <div class="info">Перетащите кнопку в превью</div>
-        </div>
-      </div>
-      <div class="sectionTitle">Чувствительность</div>
-      <div class="row">
-        <label>Движение <input id="sensMove" class="range" type="range" min="0.4" max="2.2" step="0.05"></label>
-        <label>Обзор <input id="sensLook" class="range" type="range" min="0.4" max="2.6" step="0.05"></label>
-      </div>
-      <div class="sectionTitle">Графика</div>
-      <div class="row">
-        <label><input type="radio" name="gfxPreset" value="performance"> Performance</label>
-        <label><input type="radio" name="gfxPreset" value="quality" checked> Quality</label>
-      </div>
-      <div class="btn-row">
-        <button id="resetDefaults" class="btn ghost">Сбросить</button>
-        <button id="settingsClose" class="btn ghost">Закрыть</button>
-        <button id="settingsApply" class="btn primary">Применить</button>
-      </div>
-    </div>
-  </div>
+  
   <div id="debugOverlay">
     <div id="debugPanel">
-      <div class="header"><h3>🐛 Отладка</h3><button class="close-btn" id="debugClose">✕</button></div>
-      <div id="debugContent">Загрузка...</div>
+      <div class="head">
+        <h3>🐛 Отладка</h3>
+        <div>
+          <button id="debugClear">✕</button>
+          <button id="debugClose">Закрыть</button>
+        </div>
+      </div>
+      <div id="debugContent"></div>
     </div>
   </div>
 </div>
 
 <script>
-// ============================================
-// 1. НАСТРОЙКИ
-// ============================================
-const STORAGE_KEY = 'shuterok_fixed';
-const defaultSettings = {
-  joystick:{x_pct:0.12,y_pct:0.78,scale:1.0,hitArea:0.22},
-  fire:{x_pct:0.92,y_pct:0.78,size:72},
-  sensitivity:{move:1.0,look:1.0},
-  graphics:{preset:'quality'}
-};
-let settings = loadSettings();
-function loadSettings(){try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY));return s?{joystick:{...defaultSettings.joystick,...s.joystick},fire:{...defaultSettings.fire,...s.fire},sensitivity:{...defaultSettings.sensitivity,...s.sensitivity},graphics:{...defaultSettings.graphics,...s.graphics}}:structuredClone(defaultSettings);}catch(e){return structuredClone(defaultSettings);}}
-function saveSettings(){localStorage.setItem(STORAGE_KEY,JSON.stringify(settings));}
+// ============================================================
+// 1. ПЕРЕХВАТ ОШИБОК
+// ============================================================
+const errorLog = [];
+let debugActive = false;
 
-// ============================================
-// 2. CANVAS И РЕНДЕРИНГ
-// ============================================
-const canvas=document.getElementById('gameCanvas');
-const ctx=canvas.getContext('2d');
-let W=0,H=0,DPR=1;
+function logError(source, message, data = null){
+  const entry = {
+    time: new Date().toLocaleTimeString(),
+    source: source,
+    message: message,
+    data: data ? JSON.stringify(data).slice(0, 80) : null,
+    id: Date.now()
+  };
+  errorLog.push(entry);
+  if(errorLog.length > 30) errorLog.shift();
+  console.error(`[${source}] ${message}`, data || '');
+  if(debugActive) updateDebug();
+}
+
+window.addEventListener('error', (e) => {
+  logError('GLOBAL', e.message || 'Unknown', {filename: e.filename, lineno: e.lineno});
+  return false;
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  logError('PROMISE', e.reason?.message || 'Unhandled rejection', e.reason);
+});
+
+// ============================================================
+// 2. CANVAS
+// ============================================================
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0;
+let DPR = 1;
 
 function resizeCanvas(){
-  W=window.innerWidth; H=window.innerHeight;
-  DPR=Math.min(2,Math.max(1,window.devicePixelRatio||1));
-  const qf=settings.graphics.preset==='quality'?1:0.6;
-  canvas.width=Math.max(300,Math.floor(W*DPR*qf));
-  canvas.height=Math.max(200,Math.floor(H*DPR*qf));
-  canvas.style.width=W+'px'; canvas.style.height=H+'px';
-  renderer.init();
+  try{
+    W = window.innerWidth;
+    H = window.innerHeight;
+    DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    
+    const quality = (W < 500 || H < 500) ? 0.7 : 0.9;
+    canvas.width = Math.max(300, Math.floor(W * DPR * quality));
+    canvas.height = Math.max(200, Math.floor(H * DPR * quality));
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+  }catch(e){
+    logError('CANVAS', 'Ошибка ресайза', e.message);
+  }
 }
 
-const renderer={
-  data:null,
-  init(){this.data=ctx.createImageData(canvas.width,canvas.height);},
-  clear(){for(let i=0;i<this.data.data.length;i++)this.data.data[i]=0;},
-  setPixel(x,y,r,g,b){const idx=(y*canvas.width+x)*4;if(idx>=0&&idx<this.data.data.length-4){this.data.data[idx]=r;this.data.data[idx+1]=g;this.data.data[idx+2]=b;this.data.data[idx+3]=255;}},
-  drawColumn(x,yTop,yBottom,shade,side,wallX){
-    const b=Math.max(0.15,Math.min(1,shade));
-    const base=side===0?[180,160,120]:[140,120,90];
-    const tex=Math.sin(wallX*30)*0.06+0.94;
-    const r=Math.floor(base[0]*b*tex),g=Math.floor(base[1]*b*tex),bl=Math.floor(base[2]*b*tex);
-    const ys=Math.max(0,Math.floor(yTop)),ye=Math.min(canvas.height-1,Math.floor(yBottom));
-    for(let y=ys;y<=ye;y++){const idx=(y*canvas.width+x)*4;if(idx>=0&&idx<this.data.data.length-4){this.data.data[idx]=r;this.data.data[idx+1]=g;this.data.data[idx+2]=bl;this.data.data[idx+3]=255;}}
-  },
-  drawFloorCeiling(){
-    const half=canvas.height/2;
-    for(let y=0;y<canvas.height;y++){
-      const isC=y<half,t=isC?y/half:(y-half)/half,b=isC?0.25+t*0.45:0.1+t*0.25;
-      const r=Math.floor(70*b),g=Math.floor(90*b),bl=Math.floor(120*b);
-      for(let x=0;x<canvas.width;x++){const idx=(y*canvas.width+x)*4;if(idx>=0&&idx<this.data.data.length-4){this.data.data[idx]=r;this.data.data[idx+1]=g;this.data.data[idx+2]=bl;this.data.data[idx+3]=255;}}
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ============================================================
+// 3. КАРТА 12×12
+// ============================================================
+class Map{
+  constructor(size = 12){
+    this.size = size;
+    this.grid = [];
+    this.generate();
+  }
+  
+  generate(){
+    const s = this.size;
+    this.grid = Array(s * s).fill(1);
+    
+    for(let i = 2; i < 10; i++){
+      for(let j = 2; j < 10; j++){
+        this.grid[j * s + i] = 0;
+      }
     }
-  },
-  render(){ctx.putImageData(this.data,0,0);}
+    
+    this.grid[4 * s + 4] = 1;
+    this.grid[4 * s + 7] = 1;
+    this.grid[7 * s + 4] = 1;
+    this.grid[7 * s + 7] = 1;
+    this.grid[3 * s + 5] = 1;
+    this.grid[3 * s + 6] = 1;
+    this.grid[8 * s + 5] = 1;
+    this.grid[8 * s + 6] = 1;
+    this.grid[5 * s + 3] = 1;
+    this.grid[6 * s + 3] = 1;
+    this.grid[5 * s + 8] = 1;
+    this.grid[6 * s + 8] = 1;
+  }
+  
+  at(x, y){
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    if(xi < 0 || xi >= this.size || yi < 0 || yi >= this.size) return 1;
+    return this.grid[yi * this.size + xi];
+  }
+  
+  isWall(x, y){
+    return this.at(x, y) === 1;
+  }
+}
+
+// ============================================================
+// 4. ИГРОК
+// ============================================================
+class Player{
+  constructor(x, y){
+    this.x = x;
+    this.y = y;
+    this.ang = 0;
+    this.fov = Math.PI / 3;
+    this.speed = 3.5;
+    this.turnSpeed = 2.8;
+    this.radius = 0.2;
+  }
+  
+  get dir(){
+    return {x: Math.cos(this.ang), y: Math.sin(this.ang)};
+  }
+  
+  move(dx, dy, map){
+    const nx = this.x + dx;
+    const ny = this.y + dy;
+    const r = this.radius;
+    
+    let canX = true;
+    for(let i = -r; i <= r; i += r/2){
+      if(map.isWall(nx + i, this.y)) { canX = false; break; }
+    }
+    if(canX) this.x = nx;
+    
+    let canY = true;
+    for(let i = -r; i <= r; i += r/2){
+      if(map.isWall(this.x, ny + i)) { canY = false; break; }
+    }
+    if(canY) this.y = ny;
+  }
+}
+
+// ============================================================
+// 5. РЕЙКАСТИНГ
+// ============================================================
+function castRay(px, py, ang, map){
+  const dx = Math.cos(ang);
+  const dy = Math.sin(ang);
+  
+  let x = px;
+  let y = py;
+  
+  const step = 0.01;
+  let dist = 0;
+  let hit = false;
+  let side = 0;
+  let wallX = 0;
+  
+  while(!hit && dist < 25){
+    x += dx * step;
+    y += dy * step;
+    dist += step;
+    
+    if(map.isWall(x, y)){
+      hit = true;
+      const cx = Math.floor(x);
+      const cy = Math.floor(y);
+      const fx = x - cx;
+      const fy = y - cy;
+      if(fx < 0.1 || fx > 0.9) side = 0;
+      else side = 1;
+      wallX = side === 0 ? fy : fx;
+    }
+  }
+  
+  if(!hit){
+    dist = 25;
+    wallX = 0.5;
+  }
+  
+  return {distance: dist, side, wallX};
+}
+
+// ============================================================
+// 6. УПРАВЛЕНИЕ (СТИК СЛЕДУЕТ ЗА ПАЛЬЦЕМ)
+// ============================================================
+const stick = {
+  id: null,
+  cx: 0, cy: 0,
+  radius: 60,
+  kx: 0, ky: 0,
+  pressed: false,
+  startX: 0,
+  startY: 0
 };
 
-// ============================================
-// 3. КАРТА (20x20)
-// ============================================
-class Map{
-  constructor(size=20){this.size=size;this.grid=[];this.generate();}
-  generate(){
-    const s=this.size;this.grid=Array(s*s).fill(1);
-    const rooms=[[2,2,5,5],[13,2,5,5],[2,13,5,5],[13,13,5,5],[7,7,6,6]];
-    rooms.forEach(r=>{for(let i=r[0];i<r[0]+r[2];i++)for(let j=r[1];j<r[1]+r[3];j++)if(i<s&&j<s)this.grid[j*s+i]=0;});
-    const corr=[[[4,4],[4,7]],[[4,7],[7,7]],[[16,4],[16,7]],[[16,7],[13,7]],[[4,16],[4,13]],[[4,13],[7,13]],[[16,16],[16,13]],[[16,13],[13,13]],[[7,10],[10,10]],[[10,10],[10,7]],[[7,10],[7,13]],[[10,10],[13,10]]];
-    corr.forEach(([f,t])=>{let [x,y]=f;while(x!==t[0]||y!==t[1]){if(x<t[0])x++;else if(x>t[0])x--;else if(y<t[1])y++;else if(y>t[1])y--;if(x>=0&&x<s&&y>=0&&y<s)this.grid[y*s+x]=0;}});
-    [[9,5],[10,5],[9,14],[10,14]].forEach(([x,y])=>{if(x<s&&y<s)this.grid[y*s+x]=1;});
+const look = {
+  id: null,
+  lastX: 0,
+  active: false
+};
+
+let move = {f: 0, s: 0};
+
+function resetStick(){
+  // Сброс в дефолтную позицию (только при потере касания)
+  const c = getDefaultStickCenter();
+  stick.cx = c.x;
+  stick.cy = c.y;
+  stick.radius = Math.min(Math.min(W, H) * 0.18, Math.max(35, Math.min(W, H) * 0.22));
+  stick.kx = stick.cx;
+  stick.ky = stick.cy;
+  stick.startX = stick.cx;
+  stick.startY = stick.cy;
+  move.f = 0;
+  move.s = 0;
+}
+
+function getDefaultStickCenter(){
+  const rect = canvas.getBoundingClientRect();
+  if(!rect) return {x: W * 0.12, y: H * 0.78};
+  return {
+    x: Math.round(Math.max(0.04, Math.min(0.96, 0.12)) * rect.width),
+    y: Math.round(Math.max(0.04, Math.min(0.96, 0.78)) * rect.height)
+  };
+}
+
+function updateStick(clientX, clientY){
+  const max = stick.radius;
+  
+  let dx = clientX - stick.startX;
+  let dy = clientY - stick.startY;
+  let dist = Math.hypot(dx, dy);
+  
+  // Если палец далеко — двигаем центр стика за пальцем (с плавностью)
+  if(dist > max){
+    stick.cx = stick.startX + dx * 0.5;
+    stick.cy = stick.startY + dy * 0.5;
+    dx = clientX - stick.cx;
+    dy = clientY - stick.cy;
+    dist = Math.hypot(dx, dy);
   }
-  at(x,y){const xi=Math.floor(x),yi=Math.floor(y);if(xi<0||xi>=this.size||yi<0||yi>=this.size)return 1;return this.grid[yi*this.size+xi];}
-  isWall(x,y){return this.at(x,y)===1;}
-}
-
-// ============================================
-// 4. ИГРОК
-// ============================================
-class Player{
-  constructor(x,y){this.x=x;this.y=y;this.ang=0;this.fov=Math.PI/2.8;this.speed=3.0;this.turnSpeed=2.5;this.radius=0.25;}
-  get dir(){return {x:Math.cos(this.ang),y:Math.sin(this.ang)};}
-  move(dx,dy,map){
-    const nx=this.x+dx,ny=this.y+dy;
-    if(!map.isWall(nx+this.radius,this.y)&&!map.isWall(nx-this.radius,this.y))this.x=nx;
-    if(!map.isWall(this.x,ny+this.radius)&&!map.isWall(this.x,ny-this.radius))this.y=ny;
+  
+  const dead = max * 0.06;
+  if(dist < dead){
+    stick.kx = stick.cx;
+    stick.ky = stick.cy;
+    move.f = 0;
+    move.s = 0;
+    return;
   }
-}
-
-// ============================================
-// 5. РЕЙКАСТИНГ (DDA)
-// ============================================
-function castRay(px,py,angle,map){
-  const dx=Math.cos(angle),dy=Math.sin(angle);
-  let x=px,y=py;
-  const sx=dx>0?1:-1,sy=dy>0?1:-1;
-  let tx=dx>0?(Math.floor(x)+1-x)/dx:(x-Math.floor(x))/-dx;
-  let ty=dy>0?(Math.floor(y)+1-y)/dy:(y-Math.floor(y))/-dy;
-  const tdX=1/Math.abs(dx),tdY=1/Math.abs(dy);
-  let hit=false,side=0,wallX=0,dist=0,it=0;
-  while(!hit&&it<30){it++;if(tx<ty){x+=sx*0.001;tx+=tdX;side=0;}else{y+=sy*0.001;ty+=tdY;side=1;}if(map.isWall(x,y)){hit=true;dist=Math.hypot(x-px,y-py);wallX=side===0?y-Math.floor(y):x-Math.floor(x);}}
-  if(!hit){dist=20;wallX=0.5;}
-  return {distance:dist,side,wallX};
-}
-
-// ============================================
-// 6. ПУЛИ
-// ============================================
-class Bullet{
-  constructor(x,y,ang,speed=10){this.x=x;this.y=y;this.dirX=Math.cos(ang);this.dirY=Math.sin(ang);this.speed=speed;this.life=2.5;this.alive=true;this.px=x;this.py=y;}
-  update(dt,map){
-    if(!this.alive)return;
-    this.px=this.x;this.py=this.y;
-    this.x+=this.dirX*this.speed*dt;this.y+=this.dirY*this.speed*dt;this.life-=dt;
-    if(this.life<=0){this.alive=false;return;}
-    const steps=Math.max(3,Math.ceil(this.speed*dt/0.02));
-    for(let i=0;i<=steps;i++){const t=i/steps;if(map.isWall(this.px+(this.x-this.px)*t,this.py+(this.y-this.py)*t)){this.alive=false;return;}}
+  
+  if(dist > max){
+    dx = dx / dist * max;
+    dy = dy / dist * max;
+    dist = max;
   }
-  screenPos(player,cw,ch){
-    const dx=this.x-player.x,dy=this.y-player.y,dist=Math.hypot(dx,dy);
-    if(dist<0.01)return null;
-    let ang=Math.atan2(dy,dx)-player.ang;
-    while(ang>Math.PI)ang-=Math.PI*2;while(ang<-Math.PI)ang+=Math.PI*2;
-    if(Math.abs(ang)>player.fov/2+0.2)return null;
-    return {x:(ang/player.fov+0.5)*cw,y:ch/2-(1-Math.min(1,dist/15))*ch*0.2};
-  }
+  
+  stick.kx = stick.cx + dx;
+  stick.ky = stick.cy + dy;
+  
+  const factor = (dist - dead) / (max - dead);
+  const angle = Math.atan2(dy, dx);
+  
+  move.f = -Math.sin(angle) * factor;
+  move.s = Math.cos(angle) * factor;
 }
 
-// ============================================
-// 7. СОСТОЯНИЕ
-// ============================================
-const map=new Map(20);
-const player=new Player(10,10);
-const bullets=[],hitEffects=[];
-let move={f:0,s:0,t:0},lastShot=0,paused=false,lastFrame=0,frame=0,startTime=performance.now();
-
-// ============================================
-// 8. ДЖОЙСТИК (ПРОСТОЙ И РАБОЧИЙ)
-// ============================================
-let stick={id:null,cx:0,cy:0,r:60,kx:0,ky:0,pressed:false};
-let look={id:null,lx:0};
-
-function getCenter(){return {x:Math.round(Math.max(0.04,Math.min(0.96,settings.joystick.x_pct))*W),y:Math.round(Math.max(0.04,Math.min(0.96,settings.joystick.y_pct))*H)};}
-function resetStick(){const c=getCenter();stick.cx=c.x;stick.cy=c.y;stick.r=Math.max(40,Math.min(W,H)*settings.joystick.hitArea*settings.joystick.scale);stick.kx=stick.cx;stick.ky=stick.cy;move.f=0;move.s=0;}
-function updateStick(x,y){
-  const dx=x-stick.cx,dy=y-stick.cy,d=Math.hypot(dx,dy),max=stick.r,dz=max*0.05;
-  if(d<dz){stick.kx=stick.cx;stick.ky=stick.cy;move.f=0;move.s=0;return;}
-  let kx=x,ky=y,nd=d;if(d>max){kx=stick.cx+dx*(max/d);ky=stick.cy+dy*(max/d);nd=max;}
-  stick.kx=kx;stick.ky=ky;
-  const f=(nd-dz)/(max-dz),a=Math.atan2(dy,dx);
-  move.f=Math.cos(a)*f;move.s=Math.sin(a)*f;
-}
-
-// ============================================
-// 9. ВВОД (РАБОЧАЯ ВЕРСИЯ)
-// ============================================
+// ============================================================
+// 7. ВВОД
+// ============================================================
 function setupInput(){
-  canvas.addEventListener('pointerdown',onDown);
-  canvas.addEventListener('pointermove',onMove);
-  canvas.addEventListener('pointerup',onUp);
-  canvas.addEventListener('pointercancel',onUp);
-  document.getElementById('fireBtn').addEventListener('pointerdown',onFireDown);
-  document.getElementById('fireBtn').addEventListener('pointerup',onFireUp);
+  canvas.addEventListener('pointerdown', onDown);
+  canvas.addEventListener('pointermove', onMove);
+  canvas.addEventListener('pointerup', onUp);
+  canvas.addEventListener('pointercancel', onCancel);
 }
 
 function onDown(e){
-  if(paused)return;
-  const x=e.clientX,y=e.clientY;
-  const fb=document.getElementById('fireBtn').getBoundingClientRect();
-  if(x>=fb.left&&x<=fb.right&&y>=fb.top&&y<=fb.bottom)return;
-  const c=getCenter();
-  if((x<W*0.5||Math.hypot(x-c.x,y-c.y)<stick.r*1.5)&&stick.id===null){
-    stick.id=e.pointerId;stick.pressed=true;const cc=getCenter();stick.cx=cc.x;stick.cy=cc.y;updateStick(x,y);
+  if(e.pointerType === 'mouse') return;
+  
+  const x = e.clientX;
+  const y = e.clientY;
+  
+  const fb = document.getElementById('fireBtn').getBoundingClientRect();
+  if(x >= fb.left && x <= fb.right && y >= fb.top && y <= fb.bottom) return;
+  
+  const isLeft = x < W * 0.5;
+  
+  if(isLeft && stick.id === null){
+    stick.id = e.pointerId;
+    stick.pressed = true;
+    // ============================================================
+    // ЦЕНТР СТИКА = ПОЗИЦИЯ ПАЛЬЦА
+    // ============================================================
+    stick.cx = x;
+    stick.cy = y;
+    stick.startX = x;
+    stick.startY = y;
+    stick.radius = Math.min(Math.min(W, H) * 0.18, Math.max(35, Math.min(W, H) * 0.22));
+    updateStick(x, y);
     try{canvas.setPointerCapture(e.pointerId);}catch(_){}
     return;
   }
-  if(look.id===null){look.id=e.pointerId;look.lx=x;try{canvas.setPointerCapture(e.pointerId);}catch(_){}}
-}
-
-function onMove(e){
-  if(paused)return;
-  const x=e.clientX,y=e.clientY;
-  if(e.pointerId===stick.id&&stick.pressed){updateStick(x,y);return;}
-  if(e.pointerId===look.id){const dx=x-look.lx;look.lx=x;player.ang+=dx*(Math.PI*0.8/W)*settings.sensitivity.look;}
-}
-
-function onUp(e){
-  if(e.pointerId===stick.id){stick.id=null;stick.pressed=false;move.f=0;move.s=0;stick.kx=stick.cx;stick.ky=stick.cy;try{canvas.releasePointerCapture(e.pointerId);}catch(_){}}
-  if(e.pointerId===look.id){look.id=null;try{canvas.releasePointerCapture(e.pointerId);}catch(_){}}
-}
-
-function onFireDown(e){try{e.target.setPointerCapture(e.pointerId);}catch(_){}shoot();}
-function onFireUp(e){try{e.target.releasePointerCapture(e.pointerId);}catch(_){}}
-
-function shoot(){
-  if(performance.now()-lastShot<120)return;lastShot=performance.now();
-  const d=player.dir;bullets.push(new Bullet(player.x+d.x*0.35,player.y+d.y*0.35,player.ang,9+Math.random()*2));
-  hitEffects.push({x:canvas.width/2,y:canvas.height/2,size:Math.min(canvas.width,canvas.height)*0.04,life:0.08,maxLife:0.08});
-}
-
-// ============================================
-// 10. ТРОЙНОЙ ТАП
-// ============================================
-let taps=[],debug=false;
-document.addEventListener('pointerdown',(e)=>{
-  if(e.pointerType==='mouse')return;
-  const now=performance.now();taps.push(now);taps=taps.filter(t=>now-t<1000);
-  if(taps.length>=3){taps=[];debug=!debug;document.getElementById('debugOverlay').classList.toggle('active',debug);if(debug)updateDebug();}
-});
-document.getElementById('debugClose').addEventListener('click',()=>{debug=false;document.getElementById('debugOverlay').classList.remove('active');});
-
-function updateDebug(){
-  const el=document.getElementById('debugContent');
-  const fps=lastFrame>0?Math.round(1000/(performance.now()-lastFrame)):0;
-  const info={
-    'Canvas':`${canvas.width}×${canvas.height}`,
-    'Игрок':`(${player.x.toFixed(2)},${player.y.toFixed(2)}) угол:${(player.ang*180/Math.PI).toFixed(1)}°`,
-    'Карта':`${map.size}×${map.size}`,
-    'Пули':bullets.length,
-    'FPS':fps||'...',
-    'Стик':stick.pressed?'АКТИВЕН':'неактивен',
-    'Обзор':look.id!==null?'АКТИВЕН':'неактивен',
-    'Движение':`F:${move.f.toFixed(2)} S:${move.s.toFixed(2)}`
-  };
-  let html='';for(const[k,v]of Object.entries(info))html+=`<span class="label">${k}</span> → <span class="value">${v}</span>\n`;
-  el.textContent=html;
-}
-
-// ============================================
-// 11. РЕНДЕРИНГ ИГРЫ
-// ============================================
-function render(){
-  renderer.clear();renderer.drawFloorCeiling();
-  const cols=settings.graphics.preset==='quality'?Math.floor(canvas.width*0.7):Math.floor(canvas.width*0.5);
-  const step=player.fov/cols;let ang=player.ang-player.fov/2;
-  for(let i=0;i<cols;i++){const r=castRay(player.x,player.y,ang,map);const cd=r.distance*Math.cos(ang-player.ang);const h=Math.min(canvas.height*2,canvas.height/(cd+0.01));const yt=(canvas.height-h)/2,yb=(canvas.height+h)/2;const sh=Math.max(0.1,Math.min(1,1.4-cd*0.07));const x=Math.floor((i/cols)*canvas.width);renderer.drawColumn(x,yt,yb,sh,r.side,r.wallX);ang+=step;}
-  for(const b of bullets){const sp=b.screenPos(player,canvas.width,canvas.height);if(sp){const s=Math.max(3,6*(1-Math.min(1,Math.hypot(b.x-player.x,b.y-player.y)/15)));for(let dy=-s;dy<=s;dy++)for(let dx=-s;dx<=s;dx++){if(Math.hypot(dx,dy)>s)continue;const idx=((Math.floor(sp.y)+dy)*canvas.width+Math.floor(sp.x)+dx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=255;renderer.data.data[idx+1]=220;renderer.data.data[idx+2]=100;renderer.data.data[idx+3]=255;}}}}
-  for(let i=hitEffects.length-1;i>=0;i--){const e=hitEffects[i];e.life-=1/60;if(e.life<=0){hitEffects.splice(i,1);continue;}const a=e.life/e.maxLife,s=e.size*(1+(1-a)*0.5);for(let dy=-s;dy<=s;dy++)for(let dx=-s;dx<=s;dx++){if(Math.hypot(dx,dy)>s)continue;const idx=((Math.floor(e.y)+dy)*canvas.width+Math.floor(e.x)+dx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=Math.floor(255*a);renderer.data.data[idx+1]=Math.floor(200*a);renderer.data.data[idx+2]=Math.floor(100*a);renderer.data.data[idx+3]=255;}}}
-  drawMinimap();drawCrosshair();drawStick();renderer.render();
-}
-
-// ============================================
-// 12. МИНИ-КАРТА
-// ============================================
-function drawMinimap(){
-  const s=Math.min(120,canvas.width*0.14),p=8,x=canvas.width-s-p,y=p,c=(s-4)/map.size;
-  for(let j=0;j<s;j++)for(let i=0;i<s;i++){const idx=((Math.floor(y)+j)*canvas.width+Math.floor(x)+i)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=8;renderer.data.data[idx+1]=10;renderer.data.data[idx+2]=14;renderer.data.data[idx+3]=220;}}
-  for(let my=0;my<map.size;my++)for(let mx=0;mx<map.size;mx++)if(map.isWall(mx+0.5,my+0.5)){const px=Math.floor(x+2+mx*c),py=Math.floor(y+2+my*c);for(let j=0;j<Math.ceil(c);j++)for(let i=0;i<Math.ceil(c);i++){const idx=((py+j)*canvas.width+px+i)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=120;renderer.data.data[idx+1]=120;renderer.data.data[idx+2]=120;renderer.data.data[idx+3]=180;}}}
-  const px=Math.floor(x+2+player.x*c),py=Math.floor(y+2+player.y*c),pr=Math.max(2,c*0.4);
-  for(let j=-pr;j<=pr;j++)for(let i=-pr;i<=pr;i++){if(Math.hypot(i,j)>pr)continue;const idx=((py+j)*canvas.width+px+i)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=255;renderer.data.data[idx+1]=230;renderer.data.data[idx+2]=50;renderer.data.data[idx+3]=255;}}
-  const dl=c*1.2,ex=px+Math.cos(player.ang)*dl,ey=py+Math.sin(player.ang)*dl;
-  for(let t=0;t<1;t+=0.02){const lx=Math.floor(px+(ex-px)*t),ly=Math.floor(py+(ey-py)*t);const idx=(ly*canvas.width+lx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=255;renderer.data.data[idx+1]=200;renderer.data.data[idx+2]=80;renderer.data.data[idx+3]=255;}}
-}
-
-// ============================================
-// 13. ПРИЦЕЛ
-// ============================================
-function drawCrosshair(){
-  const cx=canvas.width/2,cy=canvas.height/2,s=Math.max(10,canvas.width*0.025),g=Math.max(4,s*0.3);
-  const draw=(x1,y1,x2,y2)=>{const st=Math.max(1,Math.hypot(x2-x1,y2-y1));for(let t=0;t<=1;t+=1/st){const lx=Math.floor(x1+(x2-x1)*t),ly=Math.floor(y1+(y2-y1)*t);const idx=(ly*canvas.width+lx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=200;renderer.data.data[idx+1]=240;renderer.data.data[idx+2]=255;renderer.data.data[idx+3]=220;}}};
-  [[-s,0,-g,0],[g,0,s,0],[0,-s,0,-g],[0,g,0,s]].forEach(([x1,y1,x2,y2])=>{draw(cx+x1,cy+y1,cx+x2,cy+y2);});
-}
-
-// ============================================
-// 14. ДЖОЙСТИК (ОВЕРЛЕЙ)
-// ============================================
-function drawStick(){
-  if(!stick.pressed)return;
-  const cx=stick.cx,cy=stick.cy,r=stick.r,kx=stick.kx,ky=stick.ky;
-  for(let dy=-r*1.2;dy<=r*1.2;dy++)for(let dx=-r*1.2;dx<=r*1.2;dx++){if(Math.hypot(dx,dy)>r*1.2)continue;const px=Math.floor(cx+dx),py=Math.floor(cy+dy);if(px<0||px>=canvas.width||py<0||py>=canvas.height)continue;const idx=(py*canvas.width+px)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=20;renderer.data.data[idx+1]=30;renderer.data.data[idx+2]=40;renderer.data.data[idx+3]=150;}}
-  const kr=Math.max(12,r*0.3);
-  for(let dy=-kr;dy<=kr;dy++)for(let dx=-kr;dx<=kr;dx++){if(Math.hypot(dx,dy)>kr)continue;const px=Math.floor(kx+dx),py=Math.floor(ky+dy);if(px<0||px>=canvas.width||py<0||py>=canvas.height)continue;const idx=(py*canvas.width+px)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=80;renderer.data.data[idx+1]=200;renderer.data.data[idx+2]=255;renderer.data.data[idx+3]=220;}}
-}
-
-// ============================================
-// 15. ОБНОВЛЕНИЕ И ЦИКЛ
-// ============================================
-function update(dt){
-  const ms=player.speed*settings.sensitivity.move,ts=player.turnSpeed*settings.sensitivity.look;
-  const f=move.f*ms*dt,s=move.s*ms*dt*0.8;
-  if(f!==0||s!==0){const a=player.ang;player.move(Math.cos(a)*f-Math.sin(a)*s,Math.sin(a)*f+Math.cos(a)*s,map);}
-  if(move.t!==0)player.ang+=move.t*ts*dt;
-  for(let i=bullets.length-1;i>=0;i--){bullets[i].update(dt,map);if(!bullets[i].alive){const sp=bullets[i].screenPos(player,canvas.width,canvas.height);if(sp)hitEffects.push({x:sp.x,y:sp.y,size:Math.min(canvas.width,canvas.height)*0.02,life:0.2,maxLife:0.2});bullets.splice(i,1);}}
-  frame++;
-}
-
-function loop(t){
-  if(!lastFrame)lastFrame=t;const dt=Math.min(0.05,(t-lastFrame)/1000);lastFrame=t;
-  if(!paused){update(dt);render();if(debug&&frame%60===0)updateDebug();}
-  requestAnimationFrame(loop);
-}
-
-// ============================================
-// 16. НАСТРОЙКИ UI
-// ============================================
-function setupUI(){
-  const ov=document.getElementById('settingsOverlay'),btn=document.getElementById('settingsBtn');
-  const close=document.getElementById('settingsClose'),apply=document.getElementById('settingsApply'),reset=document.getElementById('resetDefaults');
-  const js=document.getElementById('joyScale'),ji=document.getElementById('joySize'),fs=document.getElementById('fireSize');
-  const sm=document.getElementById('sensMove'),sl=document.getElementById('sensLook'),gr=document.getElementsByName('gfxPreset');
-  const ps=document.getElementById('previewStick'),pf=document.getElementById('previewFire'),pp=document.getElementById('previewPad'),ppf=document.getElementById('previewPadFire');
   
-  function open(){paused=true;ov.style.display='flex';js.value=settings.joystick.scale;ji.value=settings.joystick.hitArea;fs.value=settings.fire.size;sm.value=settings.sensitivity.move;sl.value=settings.sensitivity.look;for(const r of gr)r.checked=r.value===settings.graphics.preset;updatePreview();}
-  function closeS(apply=false){ov.style.display='none';if(apply){saveSettings();resetStick();updateFireBtn();resizeCanvas();}paused=false;}
-  
-  btn.addEventListener('click',open);
-  close.addEventListener('click',()=>closeS(false));
-  apply.addEventListener('click',()=>{settings.joystick.scale=parseFloat(js.value);settings.joystick.hitArea=parseFloat(ji.value);settings.fire.size=parseInt(fs.value);settings.sensitivity.move=parseFloat(sm.value);settings.sensitivity.look=parseFloat(sl.value);const sel=Array.from(gr).find(r=>r.checked);if(sel)settings.graphics.preset=sel.value;closeS(true);});
-  reset.addEventListener('click',()=>{settings=structuredClone(defaultSettings);js.value=settings.joystick.scale;ji.value=settings.joystick.hitArea;fs.value=settings.fire.size;sm.value=settings.sensitivity.move;sl.value=settings.sensitivity.look;updatePreview();});
-  ov.addEventListener('click',(e)=>{if(e.target===ov)closeS(false);});
-  
-  let drag=false;ps.addEventListener('pointerdown',(e)=>{if(e.pointerType==='mouse')return;drag=true;ps.setPointerCapture(e.pointerId);});
-  window.addEventListener('pointermove',(e)=>{if(!drag||e.pointerType==='mouse')return;const r=pp.getBoundingClientRect();let lx=e.clientX-r.left,ly=e.clientY-r.top;lx=Math.max(10,Math.min(r.width-10,lx));ly=Math.max(10,Math.min(r.height-10,ly));ps.style.left=(lx-ps.offsetWidth/2)+'px';ps.style.top=(ly-ps.offsetHeight/2)+'px';settings.joystick.x_pct=Math.max(0.02,Math.min(0.98,lx/r.width));settings.joystick.y_pct=Math.max(0.02,Math.min(0.98,ly/r.height));});
-  window.addEventListener('pointerup',(e)=>{if(drag){drag=false;try{ps.releasePointerCapture(e.pointerId);}catch(_){}}});
-  
-  let dragF=false;pf.addEventListener('pointerdown',(e)=>{if(e.pointerType==='mouse')return;dragF=true;pf.setPointerCapture(e.pointerId);});
-  window.addEventListener('pointermove',(e)=>{if(!dragF||e.pointerType==='mouse')return;const r=ppf.getBoundingClientRect();let lx=e.clientX-r.left,ly=e.clientY-r.top;lx=Math.max(10,Math.min(r.width-10,lx));ly=Math.max(10,Math.min(r.height-10,ly));pf.style.left=(lx-pf.offsetWidth/2)+'px';pf.style.top=(ly-pf.offsetHeight/2)+'px';settings.fire.x_pct=Math.max(0.02,Math.min(0.98,lx/r.width));settings.fire.y_pct=Math.max(0.02,Math.min(0.98,ly/r.height));});
-  window.addEventListener('pointerup',(e)=>{if(dragF){dragF=false;try{pf.releasePointerCapture(e.pointerId);}catch(_){}}});
-  
-  js.addEventListener('input',()=>{ps.style.transform=`scale(${js.value})`;});
-  fs.addEventListener('input',()=>{const s=Math.max(30,Math.min(120,fs.value*0.6));pf.style.width=s+'px';pf.style.height=s+'px';});
-  
-  function updatePreview(){
-    const r=pp.getBoundingClientRect();const px=Math.max(10,Math.min(r.width-10,settings.joystick.x_pct*r.width));const py=Math.max(10,Math.min(r.height-10,settings.joystick.y_pct*r.height));ps.style.left=(px-ps.offsetWidth/2)+'px';ps.style.top=(py-ps.offsetHeight/2)+'px';ps.style.transform=`scale(${settings.joystick.scale})`;
-    const rf=ppf.getBoundingClientRect();const pxf=Math.max(10,Math.min(rf.width-10,settings.fire.x_pct*rf.width));const pyf=Math.max(10,Math.min(rf.height-10,settings.fire.y_pct*rf.height));const sf=Math.max(30,Math.min(120,settings.fire.size*0.6));pf.style.width=sf+'px';pf.style.height=sf+'px';pf.style.left=(pxf-sf/2)+'px';pf.style.top=(pyf-sf/2)+'px';
+  if(!isLeft && look.id === null){
+    look.id = e.pointerId;
+    look.lastX = x;
+    look.active = true;
+    try{canvas.setPointerCapture(e.pointerId);}catch(_){}
   }
 }
 
-function updateFireBtn(){
-  const btn=document.getElementById('fireBtn'),s=Math.max(40,Math.min(140,settings.fire.size));
-  btn.style.width=s+'px';btn.style.height=s+'px';
-  btn.style.left=(Math.round(Math.max(0.04,Math.min(0.96,settings.fire.x_pct))*W)-s/2)+'px';
-  btn.style.top=(Math.round(Math.max(0.04,Math.min(0.96,settings.fire.y_pct))*H)-s/2)+'px';
-  btn.style.fontSize=Math.max(20,s*0.45)+'px';
+function onMove(e){
+  if(e.pointerType === 'mouse') return;
+  
+  const x = e.clientX;
+  const y = e.clientY;
+  
+  if(e.pointerId === stick.id && stick.pressed){
+    updateStick(x, y);
+    return;
+  }
+  
+  if(e.pointerId === look.id && look.active){
+    const dx = x - look.lastX;
+    look.lastX = x;
+    const maxTurn = Math.PI / 5;
+    let turn = dx * (Math.PI * 0.7 / W);
+    turn = Math.min(maxTurn, Math.max(-maxTurn, turn));
+    player.ang += turn;
+  }
 }
 
-// ============================================
+function onUp(e){
+  if(e.pointerType === 'mouse') return;
+  
+  if(e.pointerId === stick.id){
+    stick.id = null;
+    stick.pressed = false;
+    move.f = 0;
+    move.s = 0;
+    // Возвращаем стик в дефолтную позицию
+    const c = getDefaultStickCenter();
+    stick.cx = c.x;
+    stick.cy = c.y;
+    stick.kx = stick.cx;
+    stick.ky = stick.cy;
+    try{canvas.releasePointerCapture(e.pointerId);}catch(_){}
+  }
+  
+  if(e.pointerId === look.id){
+    look.id = null;
+    look.active = false;
+    try{canvas.releasePointerCapture(e.pointerId);}catch(_){}
+  }
+}
+
+function onCancel(e){ onUp(e); }
+
+// ============================================================
+// 8. ОТЛАДКА
+// ============================================================
+document.getElementById('debugBtn').addEventListener('click', ()=>{
+  debugActive = !debugActive;
+  document.getElementById('debugOverlay').classList.toggle('active', debugActive);
+  if(debugActive) updateDebug();
+});
+
+document.getElementById('debugClose').addEventListener('click', ()=>{
+  debugActive = false;
+  document.getElementById('debugOverlay').classList.remove('active');
+});
+
+document.getElementById('debugClear').addEventListener('click', ()=>{
+  errorLog.length = 0;
+  updateDebug();
+});
+
+function updateDebug(){
+  try{
+    const el = document.getElementById('debugContent');
+    const fps = lastTime > 0 ? Math.round(1000 / (performance.now() - lastTime)) : 0;
+    const mem = performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : 'N/A';
+    const aspect = (W / H).toFixed(2);
+    
+    let ang = player.ang * 180 / Math.PI;
+    while(ang > 180) ang -= 360;
+    while(ang < -180) ang += 360;
+    
+    let html = '';
+    
+    html += `<span class="section">📊 СИСТЕМА</span>`;
+    html += `<span class="sub"><span class="lbl">FPS</span> → <span class="val ${fps < 20 ? 'err' : ''}">${fps}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Память</span> → <span class="val">${mem} MB</span></span>`;
+    html += `<span class="sub"><span class="lbl">Время</span> → <span class="val">${uptime.toFixed(1)}с</span></span>`;
+    html += `<span class="sub"><span class="lbl">Canvas</span> → <span class="val">${canvas.width}×${canvas.height}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Экран</span> → <span class="val">${W}×${H} (${aspect})</span></span>`;
+    
+    html += `<span class="section">🗺️ МИР</span>`;
+    html += `<span class="sub"><span class="lbl">Размер</span> → <span class="val">${map.size}×${map.size}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Стен</span> → <span class="val">${map.grid ? map.grid.filter(c => c === 1).length : 0}</span></span>`;
+    
+    html += `<span class="section">🎮 ИГРОК</span>`;
+    html += `<span class="sub"><span class="lbl">Позиция</span> → <span class="val">(${player.x.toFixed(2)}, ${player.y.toFixed(2)})</span></span>`;
+    html += `<span class="sub"><span class="lbl">Угол</span> → <span class="val">${ang.toFixed(1)}°</span></span>`;
+    html += `<span class="sub"><span class="lbl">В стене</span> → <span class="${map.isWall(player.x, player.y) ? 'err' : 'ok'}">${map.isWall(player.x, player.y) ? '❌ ДА' : '✅ НЕТ'}</span></span>`;
+    html += `<span class="sub"><span class="lbl">FOV</span> → <span class="val">${(player.fov * 180 / Math.PI).toFixed(1)}°</span></span>`;
+    
+    html += `<span class="section">🎮 УПРАВЛЕНИЕ</span>`;
+    html += `<span class="sub"><span class="lbl">Стик</span> → <span class="${stick.pressed ? 'ok' : ''}">${stick.pressed ? '✅ АКТИВЕН' : 'неактивен'}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Обзор</span> → <span class="${look.active ? 'ok' : ''}">${look.active ? '✅ АКТИВЕН' : 'неактивен'}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Движение</span> → <span class="val">F:${move.f.toFixed(2)} S:${move.s.toFixed(2)}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Центр стика</span> → <span class="val">(${stick.cx.toFixed(0)}, ${stick.cy.toFixed(0)})</span></span>`;
+    
+    html += `<span class="section">📏 ДИСТАНЦИЯ</span>`;
+    html += `<span class="sub"><span class="lbl">До стены</span> → <span class="val ${debugWallDist >= 24 ? 'err' : ''}">${debugWallDist.toFixed(3)}</span></span>`;
+    html += `<span class="sub"><span class="lbl">Клетка</span> → <span class="val">(${debugCellX}, ${debugCellY})</span></span>`;
+    
+    if(errorLog.length > 0){
+      html += `<span class="section">🐛 ЛОГ ОШИБОК (${errorLog.length})</span>`;
+      const lastErrors = errorLog.slice(-10);
+      for(const e of lastErrors){
+        html += `<div class="error-log">`;
+        html += `<span class="time">[${e.time}]</span> `;
+        html += `<span class="err">${e.source}</span> → `;
+        html += `<span>${e.message}</span>`;
+        html += `</div>`;
+      }
+    }
+    
+    el.innerHTML = html;
+  }catch(e){
+    document.getElementById('debugContent').textContent = 'Ошибка: ' + e.message;
+  }
+}
+
+// ============================================================
+// 9. РЕНДЕРИНГ
+// ============================================================
+let debugWallDist = 0;
+let debugCellX = 0;
+let debugCellY = 0;
+
+function render(){
+  try{
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = data.data;
+    
+    // Пол и потолок
+    const half = canvas.height / 2;
+    for(let y = 0; y < canvas.height; y++){
+      const isC = y < half;
+      const t = isC ? y / half : (y - half) / half;
+      const brightness = isC ? 0.25 + t * 0.5 : 0.1 + t * 0.4;
+      const r = isC ? Math.floor(50 * brightness) : Math.floor(30 * brightness);
+      const g = isC ? Math.floor(60 * brightness) : Math.floor(40 * brightness);
+      const bl = isC ? Math.floor(90 * brightness) : Math.floor(60 * brightness);
+      
+      for(let x = 0; x < canvas.width; x++){
+        const idx = (y * canvas.width + x) * 4;
+        d[idx] = r;
+        d[idx+1] = g;
+        d[idx+2] = bl;
+        d[idx+3] = 255;
+      }
+    }
+    
+    // Стены
+    const cols = Math.floor(canvas.width * 0.9);
+    const step = player.fov / cols;
+    let ang = player.ang - player.fov / 2;
+    
+    const wallData = [];
+    
+    for(let i = 0; i < cols; i++){
+      const ray = castRay(player.x, player.y, ang, map);
+      
+      if(i === Math.floor(cols/2)){
+        debugWallDist = ray.distance;
+        const ddx = Math.cos(ang);
+        const ddy = Math.sin(ang);
+        debugCellX = Math.floor(player.x + ddx * ray.distance);
+        debugCellY = Math.floor(player.y + ddy * ray.distance);
+      }
+      
+      let cd = ray.distance * Math.cos(ang - player.ang);
+      if(cd < 0.01) cd = 0.01;
+      
+      const h = Math.min(canvas.height * 2.5, canvas.height / (cd * 0.6 + 0.01));
+      const yTop = (canvas.height - h) / 2;
+      const yBottom = (canvas.height + h) / 2;
+      
+      const shade = Math.max(0.2, Math.min(1, 1.5 - cd * 0.05));
+      
+      const base = [140, 130, 120];
+      const r = Math.floor(base[0] * shade);
+      const g = Math.floor(base[1] * shade);
+      const bl = Math.floor(base[2] * shade);
+      
+      const x = Math.floor((i / cols) * canvas.width);
+      const nextX = Math.floor(((i + 1) / cols) * canvas.width);
+      const width = Math.max(1, nextX - x);
+      
+      const ys = Math.max(0, Math.floor(yTop));
+      const ye = Math.min(canvas.height - 1, Math.floor(yBottom));
+      
+      wallData.push({
+        x, width, ys, ye,
+        yTop, yBottom
+      });
+      
+      for(let dx = 0; dx < width; dx++){
+        const px = x + dx;
+        if(px >= canvas.width) break;
+        for(let y = ys; y <= ye; y++){
+          const idx = (y * canvas.width + px) * 4;
+          d[idx] = r;
+          d[idx+1] = g;
+          d[idx+2] = bl;
+          d[idx+3] = 255;
+        }
+      }
+      
+      ang += step;
+    }
+    
+    // Белые границы
+    const lineColor = [255, 255, 255];
+    const lineThickness = 2;
+    
+    for(let i = 0; i < wallData.length; i++){
+      const w = wallData[i];
+      
+      for(let dx = 0; dx < w.width; dx++){
+        const px = w.x + dx;
+        if(px >= canvas.width) break;
+        
+        const floorY = Math.floor(w.yBottom);
+        for(let t = 0; t < lineThickness; t++){
+          const y = floorY - t;
+          if(y >= 0 && y < canvas.height){
+            const idx = (y * canvas.width + px) * 4;
+            d[idx] = lineColor[0];
+            d[idx+1] = lineColor[1];
+            d[idx+2] = lineColor[2];
+            d[idx+3] = 255;
+          }
+        }
+        
+        const ceilY = Math.floor(w.yTop);
+        for(let t = 0; t < lineThickness; t++){
+          const y = ceilY + t;
+          if(y >= 0 && y < canvas.height){
+            const idx = (y * canvas.width + px) * 4;
+            d[idx] = lineColor[0];
+            d[idx+1] = lineColor[1];
+            d[idx+2] = lineColor[2];
+            d[idx+3] = 255;
+          }
+        }
+      }
+    }
+    
+    document.getElementById('debugDist').textContent = debugWallDist.toFixed(3);
+    document.getElementById('debugCell').textContent = `(${debugCellX}, ${debugCellY})`;
+    
+    drawDebugRay(d);
+    drawMinimap(d);
+    drawCrosshair(d);
+    drawStick(d);
+    
+    ctx.putImageData(data, 0, 0);
+  }catch(e){
+    logError('RENDER', 'Ошибка', e.message);
+  }
+}
+
+// ============================================================
+// 10. ВИЗУАЛИЗАЦИЯ ЛУЧА
+// ============================================================
+function drawDebugRay(d){
+  try{
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    
+    const rayLen = Math.min(canvas.width * 0.4, 80 + debugWallDist * 10);
+    const ang = player.ang;
+    const ex = cx + Math.cos(ang) * rayLen;
+    const ey = cy + Math.sin(ang) * rayLen;
+    
+    const steps = Math.max(10, Math.hypot(ex - cx, ey - cy));
+    for(let t = 0; t <= 1; t += 1/steps){
+      const lx = Math.floor(cx + (ex - cx) * t);
+      const ly = Math.floor(cy + (ey - cy) * t);
+      if(lx < 0 || lx >= canvas.width || ly < 0 || ly >= canvas.height) continue;
+      const idx = (ly * canvas.width + lx) * 4;
+      if(idx >= 0 && idx < d.length - 4){
+        d[idx] = 0; d[idx+1] = 255; d[idx+2] = 0; d[idx+3] = 200;
+      }
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// 11. МИНИ-КАРТА
+// ============================================================
+function drawMinimap(d){
+  try{
+    const s = Math.min(Math.max(80, canvas.width * 0.18), 160);
+    const p = 8;
+    const x = canvas.width - s - p;
+    const y = p;
+    const cell = (s - 4) / map.size;
+    
+    for(let j = 0; j < s; j++){
+      for(let i = 0; i < s; i++){
+        const px = Math.floor(x + i);
+        const py = Math.floor(y + j);
+        if(px < 0 || px >= canvas.width || py < 0 || py >= canvas.height) continue;
+        const idx = (py * canvas.width + px) * 4;
+        d[idx] = 10; d[idx+1] = 12; d[idx+2] = 18; d[idx+3] = 220;
+      }
+    }
+    
+    for(let my = 0; my < map.size; my++){
+      for(let mx = 0; mx < map.size; mx++){
+        if(map.at(mx, my) === 1){
+          const px = Math.floor(x + 2 + mx * cell);
+          const py = Math.floor(y + 2 + my * cell);
+          const w = Math.ceil(cell);
+          const h = Math.ceil(cell);
+          for(let j = 0; j < h; j++){
+            for(let i = 0; i < w; i++){
+              const idx = ((py + j) * canvas.width + px + i) * 4;
+              if(idx >= 0 && idx < d.length - 4){
+                d[idx] = 200; d[idx+1] = 200; d[idx+2] = 200; d[idx+3] = 255;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    const px = Math.floor(x + 2 + player.x * cell);
+    const py = Math.floor(y + 2 + player.y * cell);
+    const pr = Math.max(3, cell * 0.5);
+    
+    for(let j = -pr; j <= pr; j++){
+      for(let i = -pr; i <= pr; i++){
+        if(Math.hypot(i, j) > pr) continue;
+        const idx = ((py + j) * canvas.width + px + i) * 4;
+        if(idx >= 0 && idx < d.length - 4){
+          d[idx] = 0; d[idx+1] = 255; d[idx+2] = 0; d[idx+3] = 255;
+        }
+      }
+    }
+    
+    const dl = cell * 1.8;
+    const ex = px + Math.cos(player.ang) * dl;
+    const ey = py + Math.sin(player.ang) * dl;
+    const steps = Math.max(10, Math.hypot(ex - px, ey - py));
+    for(let t = 0; t <= 1; t += 1/steps){
+      const lx = Math.floor(px + (ex - px) * t);
+      const ly = Math.floor(py + (ey - py) * t);
+      if(lx < 0 || lx >= canvas.width || ly < 0 || ly >= canvas.height) continue;
+      const idx = (ly * canvas.width + lx) * 4;
+      if(idx >= 0 && idx < d.length - 4){
+        d[idx] = 255; d[idx+1] = 80; d[idx+2] = 80; d[idx+3] = 255;
+      }
+    }
+    
+    for(let i = 0; i < s; i++){
+      const idx1 = ((Math.floor(y)) * canvas.width + Math.floor(x) + i) * 4;
+      const idx2 = ((Math.floor(y) + s - 1) * canvas.width + Math.floor(x) + i) * 4;
+      const idx3 = ((Math.floor(y) + i) * canvas.width + Math.floor(x)) * 4;
+      const idx4 = ((Math.floor(y) + i) * canvas.width + Math.floor(x) + s - 1) * 4;
+      if(idx1 >= 0 && idx1 < d.length - 4){
+        d[idx1] = 80; d[idx1+1] = 80; d[idx1+2] = 80; d[idx1+3] = 255;
+        d[idx2] = 80; d[idx2+1] = 80; d[idx2+2] = 80; d[idx2+3] = 255;
+        d[idx3] = 80; d[idx3+1] = 80; d[idx3+2] = 80; d[idx3+3] = 255;
+        d[idx4] = 80; d[idx4+1] = 80; d[idx4+2] = 80; d[idx4+3] = 255;
+      }
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// 12. ПРИЦЕЛ
+// ============================================================
+function drawCrosshair(d){
+  try{
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const size = Math.max(10, canvas.width * 0.025);
+    const gap = Math.max(4, size * 0.3);
+    
+    function line(x1, y1, x2, y2){
+      const steps = Math.max(1, Math.hypot(x2 - x1, y2 - y1));
+      for(let t = 0; t <= 1; t += 1/steps){
+        const lx = Math.floor(x1 + (x2 - x1) * t);
+        const ly = Math.floor(y1 + (y2 - y1) * t);
+        if(lx < 0 || lx >= canvas.width || ly < 0 || ly >= canvas.height) continue;
+        const idx = (ly * canvas.width + lx) * 4;
+        d[idx] = 255; d[idx+1] = 50; d[idx+2] = 50; d[idx+3] = 255;
+      }
+    }
+    
+    const segs = [[-size,0,-gap,0],[gap,0,size,0],[0,-size,0,-gap],[0,gap,0,size]];
+    for(const s of segs){
+      line(cx + s[0], cy + s[1], cx + s[2], cy + s[3]);
+    }
+    for(let dy = -1; dy <= 1; dy++){
+      for(let dx = -1; dx <= 1; dx++){
+        const idx = ((cy + dy) * canvas.width + cx + dx) * 4;
+        if(idx >= 0 && idx < d.length - 4){
+          d[idx] = 255; d[idx+1] = 0; d[idx+2] = 0; d[idx+3] = 255;
+        }
+      }
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// 13. ДЖОЙСТИК
+// ============================================================
+function drawStick(d){
+  try{
+    const cx = stick.cx;
+    const cy = stick.cy;
+    const r = stick.radius;
+    const kx = stick.kx;
+    const ky = stick.ky;
+    
+    const alpha = stick.pressed ? 180 : 80;
+    for(let dy = -r*1.2; dy <= r*1.2; dy++){
+      for(let dx = -r*1.2; dx <= r*1.2; dx++){
+        if(Math.hypot(dx, dy) > r*1.2) continue;
+        const px = Math.floor(cx + dx);
+        const py = Math.floor(cy + dy);
+        if(px < 0 || px >= canvas.width || py < 0 || py >= canvas.height) continue;
+        const idx = (py * canvas.width + px) * 4;
+        d[idx] = 30; d[idx+1] = 40; d[idx+2] = 60; d[idx+3] = alpha;
+      }
+    }
+    
+    for(let dy = -r; dy <= r; dy++){
+      for(let dx = -r; dx <= r; dx++){
+        const dist = Math.hypot(dx, dy);
+        if(dist > r - 1 && dist < r + 1){
+          const px = Math.floor(cx + dx);
+          const py = Math.floor(cy + dy);
+          if(px < 0 || px >= canvas.width || py < 0 || py >= canvas.height) continue;
+          const idx = (py * canvas.width + px) * 4;
+          d[idx] = 80; d[idx+1] = 100; d[idx+2] = 140; d[idx+3] = alpha;
+        }
+      }
+    }
+    
+    const kr = Math.max(12, r * 0.3);
+    const handleX = stick.pressed ? kx : cx;
+    const handleY = stick.pressed ? ky : cy;
+    
+    for(let dy = -kr; dy <= kr; dy++){
+      for(let dx = -kr; dx <= kr; dx++){
+        if(Math.hypot(dx, dy) > kr) continue;
+        const px = Math.floor(handleX + dx);
+        const py = Math.floor(handleY + dy);
+        if(px < 0 || px >= canvas.width || py < 0 || py >= canvas.height) continue;
+        const idx = (py * canvas.width + px) * 4;
+        if(stick.pressed){
+          d[idx] = 255; d[idx+1] = 100; d[idx+2] = 100; d[idx+3] = 255;
+        }else{
+          d[idx] = 150; d[idx+1] = 150; d[idx+2] = 180; d[idx+3] = 150;
+        }
+      }
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// 14. КНОПКА FIRE
+// ============================================================
+function updateFireBtn(){
+  try{
+    const btn = document.getElementById('fireBtn');
+    const s = Math.min(72, Math.max(52, Math.min(W, H) * 0.1));
+    const px = Math.round(Math.max(0.04, Math.min(0.96, 0.92)) * W);
+    const py = Math.round(Math.max(0.04, Math.min(0.96, 0.78)) * H);
+    btn.style.width = s + 'px';
+    btn.style.height = s + 'px';
+    btn.style.left = (px - s / 2) + 'px';
+    btn.style.top = (py - s / 2) + 'px';
+    btn.style.fontSize = Math.max(10, s * 0.2) + 'px';
+  }catch(e){
+    logError('UI', 'Ошибка кнопки огня', e.message);
+  }
+}
+
+// ============================================================
+// 15. ОБНОВЛЕНИЕ
+// ============================================================
+let lastTime = 0;
+let frame = 0;
+let uptime = 0;
+
+function update(dt){
+  try{
+    uptime += dt;
+    
+    const ms = player.speed * 1.0;
+    const forward = move.f * ms * dt;
+    const strafe = move.s * ms * dt * 0.8;
+    
+    if(forward !== 0 || strafe !== 0){
+      const a = player.ang;
+      const dx = Math.cos(a) * forward - Math.sin(a) * strafe;
+      const dy = Math.sin(a) * forward + Math.cos(a) * strafe;
+      if(isFinite(dx) && isFinite(dy)){
+        player.move(dx, dy, map);
+      }
+    }
+    
+    frame++;
+  }catch(e){
+    logError('UPDATE', 'Ошибка', e.message);
+  }
+}
+
+// ============================================================
+// 16. ГЛАВНЫЙ ЦИКЛ
+// ============================================================
+function loop(time){
+  try{
+    if(!lastTime) lastTime = time;
+    const dt = Math.min(0.05, (time - lastTime) / 1000);
+    lastTime = time;
+    
+    update(dt);
+    render();
+    
+    if(debugActive && frame % 30 === 0) updateDebug();
+    
+    requestAnimationFrame(loop);
+  }catch(e){
+    logError('LOOP', 'Критическая ошибка', e.message);
+    setTimeout(() => requestAnimationFrame(loop), 100);
+  }
+}
+
+// ============================================================
 // 17. ЗАПУСК
-// ============================================
-resizeCanvas();resetStick();updateFireBtn();setupInput();setupUI();
-window.addEventListener('resize',()=>{W=window.innerWidth;H=window.innerHeight;resizeCanvas();resetStick();updateFireBtn();});
-requestAnimationFrame(loop);
-console.log('🔥 Shuterok FIXED загружен! Тройной тап для отладки.');
+// ============================================================
+const map = new Map(12);
+const player = new Player(5, 5);
+
+try{
+  resizeCanvas();
+  resetStick();
+  updateFireBtn();
+  setupInput();
+  
+  let resizeTimeout = null;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(()=>{
+      try{
+        W = window.innerWidth;
+        H = window.innerHeight;
+        resizeCanvas();
+        resetStick();
+        updateFireBtn();
+        if(debugActive) updateDebug();
+      }catch(e){
+        logError('RESIZE', 'Ошибка', e.message);
+      }
+    }, 150);
+  });
+  
+  requestAnimationFrame(loop);
+  console.log('🔥 Shuterok — готов!');
+  console.log(`🗺️ Карта: ${map.size}×${map.size}`);
+  console.log(`🎮 Игрок: (${player.x}, ${player.y})`);
+  console.log('📱 Левая половина → движение, правая → обзор');
+  console.log('🎯 Стик появляется под пальцем');
+}catch(e){
+  console.error('Критическая ошибка:', e);
+  document.body.innerHTML = `<div style="color:#fff;padding:20px;font-family:monospace;background:#0a0c0f;min-height:100vh;">
+    <h2 style="color:#ff4444;">❌ Ошибка запуска</h2>
+    <p>${e.message}</p>
+    <pre style="color:#8aaccc;font-size:12px;margin-top:12px;white-space:pre-wrap;">${e.stack}</pre>
+  </div>`;
+}
 </script>
 </body>
 </html>
