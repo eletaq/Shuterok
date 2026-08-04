@@ -4,29 +4,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>Shuterok — touch-only + настраиваемая кнопка огня</title>
+<title>Shuterok — touch-only (updated)</title>
 <style>
-  :root{--accent:#4fc3f7;}
+  :root{--accent:#4fc3f7; --ui-size:16px;}
   html,body{height:100%; margin:0; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color: transparent; background:#000; font-family:system-ui,Segoe UI,Roboto,Arial;}
   #gameWrap{position:relative; height:100vh; width:100vw; overflow:hidden;}
   canvas{display:block; width:100%; height:100%; background:#111; touch-action:none;}
-  /* settings gear */
   #settingsBtn{position:absolute; right:12px; top:12px; z-index:1100; width:44px; height:44px; border-radius:10px; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; color:#fff; border:1px solid rgba(255,255,255,0.06); box-shadow:0 6px 18px rgba(0,0,0,0.5);}
-  /* fire button (DOM element) */
-  #fireBtn{
-    position:absolute; z-index:1050;
-    width:72px; height:72px; border-radius:50%;
-    background: radial-gradient(circle at 30% 30%, #ffd97a, #ff5400);
-    box-shadow: 0 8px 24px rgba(255,84,0,0.28);
-    display:flex; align-items:center; justify-content:center;
-    color:#111; font-weight:700; user-select:none; touch-action:none;
-  }
-  /* settings overlay */
+  #fireBtn{position:absolute; z-index:1050; width:72px; height:72px; border-radius:50%; background: radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow: 0 8px 24px rgba(255,84,0,0.28); display:flex; align-items:center; justify-content:center; color:#111; font-weight:700; user-select:none; touch-action:none;}
   #settingsOverlay{position:absolute; inset:0; z-index:1200; display:none; align-items:flex-start; justify-content:center; background:linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.65)); padding:18px;}
   #settingsPanel{width:min(96vw,540px); background:#0f1113; color:#e6eef6; border-radius:12px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.6);}
   #settingsPanel h2{margin:4px 0 8px; font-size:18px;}
   .row{display:flex; gap:10px; align-items:center; margin:8px 0;}
-  .col{display:flex; flex-direction:column; gap:8px;}
   label{font-size:13px; color:#cfe9ff;}
   .range{width:100%;}
   .btn-row{display:flex; gap:8px; justify-content:flex-end; margin-top:12px;}
@@ -49,9 +38,10 @@
   <div id="fireBtn" aria-label="Огонь">●</div>
 
   <div id="settingsBtn" title="Настройки" aria-label="Настройки">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- fixed, centered settings icon (no weird transform) -->
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 16.9l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.7 0 1.28-.41 1.51-1a1.65 1.65 0 0 0-.33-1.82L4.3 2.3A2 2 0 1 1 7.12.48l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 11.5 0H12a2 2 0 1 1 4 0h.09c.7 0 1.28.41 1.51 1 .13.41.45.76.86.96l.06.02a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82v.09c0 .7.41 1.28 1 1.51H21a2 2 0 1 1 0 4h-.09c-.41 0-.76.45-.96.86z" transform="scale(.8) translate(3,3)"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 16.9l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.7 0 1.28-.41 1.51-1a1.65 1.65 0 0 0-.33-1.82L4.3 2.3A2 2 0 1 1 7.12.48l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 11.5 0H12a2 2 0 1 1 4 0h.09c.7 0 1.28.41 1.51 1 .13.41.45.76.86.96l.06.02a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82v.09c0 .7.41 1.28 1 1.51H21a2 2 0 1 1 0 4h-.09c-.41 0-.76.45-.96.86z"/>
     </svg>
   </div>
 
@@ -68,7 +58,7 @@
         <div style="flex:1; display:flex; flex-direction:column;">
           <label>Масштаб стика <input id="joyScale" class="range" type="range" min="0.6" max="1.6" step="0.05"></label>
           <label>Размер области касания <input id="joySize" class="range" type="range" min="0.12" max="0.45" step="0.01"></label>
-          <div class="info">Перетащите кружок в превью для установки позиции стика (относительно левого края экрана).</div>
+          <div class="info">Перетащите кружок в превью для установки позиции стика (относительно экрана).</div>
         </div>
       </div>
 
@@ -80,7 +70,7 @@
         </div>
         <div style="flex:1; display:flex; flex-direction:column;">
           <label>Размер кнопки <input id="fireSize" class="range" type="range" min="36" max="110" step="2"></label>
-          <div class="info">Перетащите кнопку в превью, чтобы задать положение огня (относительно правой стороны экрана).</div>
+          <div class="info">Перетащите кнопку в превью для установки позиции огня (относительно экрана).</div>
         </div>
       </div>
 
@@ -106,21 +96,21 @@
 </div>
 
 <script>
-/* ===== SETTINGS STORAGE ===== */
-const STORAGE_KEY = 'shuterok_touch_v2';
+/* ===== SETTINGS STORAGE (normalized coordinates 0..1) ===== */
+const STORAGE_KEY = 'shuterok_touch_v3';
 const defaultSettings = {
-  joystick: { x_pct: 0.12, y_pct: 0.78, scale: 1.0, hitArea: 0.22 },
-  fire: { x_pct: 0.92, y_pct: 0.78, size: 72 },
+  joystick: { x_pct: 0.12, y_pct: 0.78, scale: 1.0, hitArea: 0.22 }, // x_pct,y_pct normalized 0..1
+  fire: { x_pct: 0.92, y_pct: 0.78, size: 72 }, // normalized
   sensitivity: { move: 1.0, look: 1.0 },
   graphics: { preset: 'performance' }
 };
 let settings = loadSettings();
-function loadSettings(){ try{ const s = JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); return s ? mergeDefaults(s) : structuredClone(defaultSettings); } catch(e){ return structuredClone(defaultSettings); } }
+function loadSettings(){ try{ const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); return s?mergeDefaults(s):structuredClone(defaultSettings);}catch(e){return structuredClone(defaultSettings);} }
 function mergeDefaults(s){ return {
-  joystick: Object.assign({}, defaultSettings.joystick, s.joystick || {}),
-  fire: Object.assign({}, defaultSettings.fire, s.fire || {}),
-  sensitivity: Object.assign({}, defaultSettings.sensitivity, s.sensitivity || {}),
-  graphics: Object.assign({}, defaultSettings.graphics, s.graphics || {})
+  joystick: Object.assign({}, defaultSettings.joystick, s.joystick||{}),
+  fire: Object.assign({}, defaultSettings.fire, s.fire||{}),
+  sensitivity: Object.assign({}, defaultSettings.sensitivity, s.sensitivity||{}),
+  graphics: Object.assign({}, defaultSettings.graphics, s.graphics||{})
 }; }
 function saveSettings(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
 
@@ -149,16 +139,32 @@ let movement = { forward:0, strafe:0, turn:0 };
 let moveSpeedBase = 2.6, turnSpeedBase = 2.8;
 let rendererState = { pixelRatio:1, columnsFactor:0.6, columns:120 };
 
-function applyGraphicsPreset(){ if (settings.graphics.preset === 'performance') { rendererState.pixelRatio = Math.min(1.0, DPR*0.9); rendererState.columnsFactor = 0.55; } else { rendererState.pixelRatio = Math.min(1.5, DPR*1.0); rendererState.columnsFactor = 1.0; } resizeCanvas(); }
-function resizeCanvas(){ const cssW = window.innerWidth, cssH = window.innerHeight; canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px'; canvas.width = Math.max(300, Math.floor(cssW * rendererState.pixelRatio)); canvas.height = Math.max(200, Math.floor(cssH * rendererState.pixelRatio)); rendererState.columns = Math.max(40, Math.floor(canvas.width * 0.6 * rendererState.columnsFactor)); }
+function applyGraphicsPreset(){ if(settings.graphics.preset==='performance'){ rendererState.pixelRatio = Math.min(1.0, DPR*0.9); rendererState.columnsFactor = 0.55; } else { rendererState.pixelRatio = Math.min(1.5, DPR*1.0); rendererState.columnsFactor = 1.0; } resizeCanvas(); }
+function resizeCanvas(){ const cssW = window.innerWidth, cssH = window.innerHeight; canvas.style.width = cssW+'px'; canvas.style.height = cssH+'px'; canvas.width = Math.max(300, Math.floor(cssW * rendererState.pixelRatio)); canvas.height = Math.max(200, Math.floor(cssH * rendererState.pixelRatio)); rendererState.columns = Math.max(40, Math.floor(canvas.width * 0.6 * rendererState.columnsFactor)); }
 
-/* RAYCAST & RENDER */
-function castRays(){ const w=canvas.width,h=canvas.height, step=player.fov/rendererState.columns; let rayAng=player.ang-player.fov/2; for(let i=0;i<rendererState.columns;i++,rayAng+=step){ const dx=Math.cos(rayAng), dy=Math.sin(rayAng); let dist=0, hit=false, side=0; while(!hit && dist<20){ dist += 0.02 * (1 + Math.floor(rendererState.columns/220)); const rx = player.x + dx*dist, ry = player.y + dy*dist; if (map.at(Math.floor(rx), Math.floor(ry)) === 1) { hit=true; side = ((rx-Math.floor(rx))<0.2 || (rx-Math.floor(rx))>0.8) ? 0 : 1; } } const fish = Math.cos(rayAng - player.ang); const proj = (player.fov/(dist||0.0001))*(canvas.width*0.4); const lineH = Math.min(canvas.height*2, Math.max(2, Math.floor(proj/fish))); const x = Math.floor((i/rendererState.columns)*canvas.width); const shade = Math.max(0.2, Math.min(1, 1.6 - dist*0.11)); const col = side ? Math.floor(60*shade) : Math.floor(180*shade); ctx.fillStyle = `rgb(${col},${col},${col})`; ctx.fillRect(x, Math.ceil((canvas.height-lineH)/2), Math.max(1, Math.ceil(canvas.width/rendererState.columns)), lineH); } }
-function drawMiniMap(){ const size = Math.min(160, Math.floor(canvas.width*0.18)), pad = 10 * rendererState.pixelRatio, sx = pad, sy = pad, cell = (size - pad*2) / map.w; ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(sx-6, sy-6, size+12, size+12); for(let y=0;y<map.h;y++){ for(let x=0;x<map.w;x++){ ctx.fillStyle = map.at(x,y) ? '#aaaaaa' : '#1a1a1a'; ctx.fillRect(sx + x*cell, sy + y*cell, Math.ceil(cell), Math.ceil(cell)); } } ctx.fillStyle = '#ffeb3b'; ctx.beginPath(); ctx.arc(sx + player.x*cell, sy + player.y*cell, Math.max(2, cell*0.25), 0, Math.PI*2); ctx.fill(); ctx.strokeStyle='#ffd54f'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(sx + player.x*cell, sy + player.y*cell); ctx.lineTo(sx + (player.x + Math.cos(player.ang)*0.8)*cell, sy + (player.y + Math.sin(player.ang)*0.8)*cell); ctx.stroke(); ctx.restore(); }
+/* ===== RAYCAST & RENDER (kept simple) ===== */
+function castRays(){ const w=canvas.width,h=canvas.height, halfH=h*0.5, step=player.fov/rendererState.columns; let rayAng=player.ang-player.fov/2; for(let i=0;i<rendererState.columns;i++,rayAng+=step){ const dx=Math.cos(rayAng), dy=Math.sin(rayAng); let dist=0, hit=false, side=0; while(!hit && dist<20){ dist+=0.02*(1+Math.floor(rendererState.columns/220)); const rx=player.x+dx*dist, ry=player.y+dy*dist; if(map.at(Math.floor(rx),Math.floor(ry))===1){ hit=true; const sx=Math.floor(rx), cy=ry-Math.floor(ry); side=( (rx-Math.floor(rx))<0.2 || (rx-Math.floor(rx))>0.8)?0:1; } } const fish=Math.cos(rayAng-player.ang); const proj=(player.fov/(dist||0.0001))*(canvas.width*0.4); const lineH=Math.min(canvas.height*2, Math.max(2, Math.floor(proj/fish))); const x=Math.floor((i/rendererState.columns)*canvas.width); const shade=Math.max(0.2, Math.min(1, 1.6-dist*0.11)); const col=side?Math.floor(60*shade):Math.floor(180*shade); ctx.fillStyle=`rgb(${col},${col},${col})`; ctx.fillRect(x, Math.ceil((canvas.height-lineH)/2), Math.max(1, Math.ceil(canvas.width/rendererState.columns)), lineH); } }
+function drawMiniMap(){ const size=Math.min(160, Math.floor(canvas.width*0.18)), pad=10*rendererState.pixelRatio, sx=pad, sy=pad, cell=(size-pad*2)/map.w; ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(sx-6, sy-6, size+12, size+12); for(let y=0;y<map.h;y++){ for(let x=0;x<map.w;x++){ ctx.fillStyle = map.at(x,y)?'#aaaaaa':'#1a1a1a'; ctx.fillRect(sx + x*cell, sy + y*cell, Math.ceil(cell), Math.ceil(cell)); } } ctx.fillStyle='#ffeb3b'; ctx.beginPath(); ctx.arc(sx + player.x*cell, sy + player.y*cell, Math.max(2, cell*0.25), 0, Math.PI*2); ctx.fill(); ctx.strokeStyle='#ffd54f'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(sx + player.x*cell, sy + player.y*cell); ctx.lineTo(sx + (player.x + Math.cos(player.ang)*0.8)*cell, sy + (player.y + Math.sin(player.ang)*0.8)*cell); ctx.stroke(); ctx.restore(); }
 
-/* HUD shot flash */
+/* HUD / shot flash */
 let lastShotTs = 0;
-function renderBase(){ ctx.fillStyle='#20242a'; ctx.fillRect(0,0,canvas.width,canvas.height); const skyGrad = ctx.createLinearGradient(0,0,0,canvas.height*0.6); skyGrad.addColorStop(0,'#6fa4d6'); skyGrad.addColorStop(1,'#225a8a'); ctx.fillStyle = skyGrad; ctx.fillRect(0,0,canvas.width,canvas.height*0.5); ctx.fillStyle = '#2d2f33'; ctx.fillRect(0, canvas.height*0.5, canvas.width, canvas.height*0.5); castRays(); drawMiniMap(); // shot flash
+
+/* bullets & hit effects (projectile simplified) */
+let bullets = []; // {x,y,dirX,dirY,speed,radius,ttl}
+let hitEffects = []; // {screenX,screenY,size,ttl,created}
+
+/* simple weapon config */
+const weapon = { muzzleOffset: 0.28, bulletSpeed: 8.0, bulletRadiusPx: 4, bulletTTL: 1.8, hitSpriteSize: 22, hitSpriteTTL: 260 };
+
+/* render base */
+function renderBase(){
+  ctx.fillStyle='#20242a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const skyGrad = ctx.createLinearGradient(0,0,0,canvas.height*0.6);
+  skyGrad.addColorStop(0,'#6fa4d6'); skyGrad.addColorStop(1,'#225a8a');
+  ctx.fillStyle = skyGrad; ctx.fillRect(0,0,canvas.width,canvas.height*0.5);
+  ctx.fillStyle = '#2d2f33'; ctx.fillRect(0, canvas.height*0.5, canvas.width, canvas.height*0.5);
+  castRays(); drawMiniMap();
+  // shot flash
   if (performance.now() - lastShotTs < 120) {
     ctx.save();
     ctx.globalAlpha = 0.9 - (performance.now() - lastShotTs) / 120;
@@ -169,89 +175,233 @@ function renderBase(){ ctx.fillStyle='#20242a'; ctx.fillRect(0,0,canvas.width,ca
   }
 }
 
-/* MAIN LOOP */
-function update(dt){ const moveSpeed = moveSpeedBase * settings.sensitivity.move; const turnSpeed = turnSpeedBase * settings.sensitivity.look; const forwardVel = movement.forward * moveSpeed * dt; const strafeVel = movement.strafe * moveSpeed * dt; const nx = player.x + Math.cos(player.ang) * forwardVel - Math.sin(player.ang) * strafeVel; const ny = player.y + Math.sin(player.ang) * forwardVel + Math.cos(player.ang) * strafeVel; if (map.at(Math.floor(nx), Math.floor(player.y)) === 0) player.x = nx; if (map.at(Math.floor(player.x), Math.floor(ny)) === 0) player.y = ny; player.ang += movement.turn * turnSpeed * dt; }
-function loop(ts){ if (paused) { lastFrameTs = ts; requestAnimationFrame(loop); return; } if (!lastFrameTs) lastFrameTs = ts; const dt = Math.min(0.05, (ts - lastFrameTs) / 1000); lastFrameTs = ts; update(dt); render(); requestAnimationFrame(loop); }
+/* draw crosshair (center) */
+function drawCrosshair(){
+  const cx = canvas.width*0.5, cy = canvas.height*0.5;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,240,200,0.95)';
+  ctx.lineWidth = Math.max(2, Math.floor(2 * rendererState.pixelRatio));
+  const size = Math.max(10, Math.floor(12 * rendererState.pixelRatio));
+  ctx.beginPath();
+  ctx.moveTo(cx - size, cy); ctx.lineTo(cx - 4, cy);
+  ctx.moveTo(cx + size, cy); ctx.lineTo(cx + 4, cy);
+  ctx.moveTo(cx, cy - size); ctx.lineTo(cx, cy - 4);
+  ctx.moveTo(cx, cy + size); ctx.lineTo(cx, cy + 4);
+  ctx.stroke();
+  ctx.restore();
+}
 
-/* STICK STATE (left) */
+/* draw bullets & hit effects (over HUD) */
+function drawProjectilesAndEffects(){
+  // bullets
+  ctx.save();
+  for (let b of bullets){
+    // draw small circle in screen space: we need to project world pos roughly to screen
+    const sp = worldToScreen(b.x, b.y);
+    if (!sp) continue;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255,220,120,0.95)';
+    ctx.arc(sp.x, sp.y, Math.max(2, b.radius), 0, Math.PI*2);
+    ctx.fill();
+  }
+  // hit effects
+  const now = performance.now();
+  for (let i = hitEffects.length-1; i>=0; i--){
+    const e = hitEffects[i];
+    const age = now - e.created;
+    if (age > e.ttl){ hitEffects.splice(i,1); continue; }
+    const a = 1 - (age / e.ttl);
+    ctx.save();
+    ctx.globalAlpha = a;
+    const s = e.size * (1 + (1 - a)*0.25);
+    const grad = ctx.createRadialGradient(e.screenX, e.screenY, 0, e.screenX, e.screenY, s);
+    grad.addColorStop(0, 'rgba(255,240,200,0.95)');
+    grad.addColorStop(0.4, 'rgba(255,180,90,0.8)');
+    grad.addColorStop(1, 'rgba(120,40,20,0.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(e.screenX, e.screenY, s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* MAIN LOOP */
+function update(dt){
+  const moveSpeed = moveSpeedBase * settings.sensitivity.move;
+  const turnSpeed = turnSpeedBase * settings.sensitivity.look;
+  const forwardVel = movement.forward * moveSpeed * dt;
+  const strafeVel = movement.strafe * moveSpeed * dt;
+  const nx = player.x + Math.cos(player.ang) * forwardVel - Math.sin(player.ang) * strafeVel;
+  const ny = player.y + Math.sin(player.ang) * forwardVel + Math.cos(player.ang) * strafeVel;
+  if(map.at(Math.floor(nx), Math.floor(player.y))===0) player.x = nx;
+  if(map.at(Math.floor(player.x), Math.floor(ny))===0) player.y = ny;
+  player.ang += movement.turn * turnSpeed * dt;
+
+  // bullets update
+  for (let i = bullets.length-1; i>=0; i--){
+    const b = bullets[i];
+    b.x += b.dirX * b.speed * dt;
+    b.y += b.dirY * b.speed * dt;
+    b.ttl -= dt;
+    // collision with world
+    if (map.at(Math.floor(b.x), Math.floor(b.y))===1 || b.ttl <= 0){
+      // spawn hit effect projected to screen
+      const sp = worldToScreen(b.x, b.y);
+      if (sp){
+        hitEffects.push({ screenX: sp.x, screenY: sp.y, size: weapon.hitSpriteSize, ttl: weapon.hitSpriteTTL, created: performance.now() });
+      }
+      bullets.splice(i,1);
+    }
+  }
+
+  // hitEffects cleanup handled during draw
+}
+
+function loop(ts){
+  if(paused){ lastFrameTs = ts; requestAnimationFrame(loop); return; }
+  if(!lastFrameTs) lastFrameTs = ts;
+  const dt = Math.min(0.05, (ts-lastFrameTs)/1000);
+  lastFrameTs = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ===== STICK STATE & helpers (left) ===== */
 let activeStickId = null;
 let stickState = { centerX:0, centerY:0, radius:60, knobX:0, knobY:0, pressed:false };
-function resetStickFromSettings(){ const w = window.innerWidth, h = window.innerHeight; stickState.radius = Math.max(36, Math.floor(Math.min(w,h) * settings.joystick.hitArea * settings.joystick.scale)); stickState.centerX = Math.floor(settings.joystick.x_pct * w); stickState.centerY = Math.floor(settings.joystick.y_pct * h); stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY; }
-resetStickFromSettings();
-function drawStickOverlay(){ ctx.save(); ctx.globalAlpha = 0.75; ctx.beginPath(); ctx.fillStyle='rgba(10,10,13,0.15)'; ctx.arc(stickState.centerX, stickState.centerY, stickState.radius*1.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.fillStyle='rgba(80,200,255,0.95)'; ctx.arc(stickState.knobX, stickState.knobY, Math.max(12, stickState.radius*0.36), 0, Math.PI*2); ctx.fill(); ctx.restore(); }
 
-/* LOOK (right side swipe) */
+/* unified function: compute center px from normalized settings */
+function getStickCenterPx(){
+  const w = window.innerWidth, h = window.innerHeight;
+  const x = Math.round(Math.max(0.02, Math.min(0.98, settings.joystick.x_pct)) * w);
+  const y = Math.round(Math.max(0.02, Math.min(0.98, settings.joystick.y_pct)) * h);
+  return { x, y };
+}
+function resetStickFromSettings(){
+  const w = window.innerWidth, h = window.innerHeight;
+  stickState.radius = Math.max(36, Math.floor(Math.min(w,h) * settings.joystick.hitArea * settings.joystick.scale));
+  const c = getStickCenterPx();
+  stickState.centerX = c.x; stickState.centerY = c.y;
+  stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
+}
+resetStickFromSettings();
+
+function drawStickOverlay(){
+  ctx.save();
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath(); ctx.fillStyle='rgba(10,10,13,0.15)'; ctx.arc(stickState.centerX, stickState.centerY, stickState.radius*1.2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.fillStyle='rgba(80,200,255,0.95)'; ctx.arc(stickState.knobX, stickState.knobY, Math.max(12, stickState.radius*0.36), 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+/* mapping helpers for movement (left stick only affects movement: forward + strafe) */
+function computeForwardFromKnob(){ const dy = (stickState.knobY - stickState.centerY); const norm = Math.max(1, stickState.radius); return Math.max(-1, Math.min(1, -(dy / norm))); }
+function computeStrafeFromKnob(){ const dx = (stickState.knobX - stickState.centerX); const norm = Math.max(1, stickState.radius); return Math.max(-1, Math.min(1, (dx / norm))); }
+
+/* ===== LOOK (right side swipe) ===== */
 let activeLookId = null;
 let lastLookX = 0;
 function startLook(pointerId, x){ activeLookId = pointerId; lastLookX = x; }
-function moveLook(x){ if (activeLookId === null) return; const dx = x - lastLookX; lastLookX = x; // map pixel dx to angular change using sensitivity.look
-  const factor = (Math.PI * 0.9) / window.innerWidth; // full screen swipe ~ 0.9*PI rad
-  player.ang += dx * factor * settings.sensitivity.look;
-}
-function endLook(pid){ if (activeLookId === pid) { activeLookId = null; lastLookX = 0; } }
+function moveLook(x){ if(activeLookId === null) return; const dx = x - lastLookX; lastLookX = x; const factor = (Math.PI * 0.9) / window.innerWidth; player.ang += dx * factor * settings.sensitivity.look; }
+function endLook(pid){ if(activeLookId === pid){ activeLookId = null; lastLookX = 0; } }
 
-/* FIRE BUTTON (DOM) */
+/* ===== WORLD -> SCREEN projection helper (approximate using angle) =====
+   returns {x,y} in canvas pixel coords or null if not projectable
+*/
+function normalizeAngle(a){ while(a <= -Math.PI) a += Math.PI*2; while(a > Math.PI) a -= Math.PI*2; return a; }
+function worldToScreen(wx, wy){
+  const dx = wx - player.x, dy = wy - player.y;
+  const ang = Math.atan2(dy, dx);
+  let angDiff = normalizeAngle(ang - player.ang);
+  // If outside fov, still clamp to edge
+  const halfFov = player.fov * 0.5;
+  if (angDiff < -halfFov) angDiff = -halfFov;
+  if (angDiff > halfFov) angDiff = halfFov;
+  const rel = angDiff / player.fov; // -0.5..0.5
+  const sx = Math.round((0.5 + rel) * canvas.width);
+  // approximate vertical position by distance: closer => center, farther => slightly lower
+  const dist = Math.hypot(dx, dy);
+  const sy = Math.round(canvas.height*0.5 + Math.min(canvas.height*0.22, (dist-1) * 6 * rendererState.pixelRatio));
+  return { x: sx, y: sy };
+}
+
+/* ===== FIRE BUTTON & weapon (DOM) ===== */
 const fireBtn = document.getElementById('fireBtn');
-function updateFireButtonPosition(){ const w = window.innerWidth, h = window.innerHeight; const px = Math.round(settings.fire.x_pct * w); const py = Math.round(settings.fire.y_pct * h); const size = Math.max(36, Math.min(140, settings.fire.size)); fireBtn.style.width = size + 'px'; fireBtn.style.height = size + 'px'; fireBtn.style.left = (px - size/2) + 'px'; fireBtn.style.top = (py - size/2) + 'px'; fireBtn.style.lineHeight = size + 'px'; fireBtn.style.fontSize = Math.max(18, Math.floor(size*0.42)) + 'px'; }
+function updateFireButtonPosition(){ const w = window.innerWidth, h = window.innerHeight; const px = Math.round(Math.max(0.02, Math.min(0.98, settings.fire.x_pct)) * w); const py = Math.round(Math.max(0.02, Math.min(0.98, settings.fire.y_pct)) * h); const size = Math.max(36, Math.min(140, settings.fire.size)); fireBtn.style.width = size + 'px'; fireBtn.style.height = size + 'px'; fireBtn.style.left = (px - size/2) + 'px'; fireBtn.style.top = (py - size/2) + 'px'; fireBtn.style.lineHeight = size + 'px'; fireBtn.style.fontSize = Math.max(18, Math.floor(size*0.42)) + 'px'; }
 updateFireButtonPosition();
 
-/* Fire action */
-function doFire() {
+function spawnBullet(){
+  // muzzle spawn in world coords
+  const mx = player.x + Math.cos(player.ang) * weapon.muzzleOffset;
+  const my = player.y + Math.sin(player.ang) * weapon.muzzleOffset;
+  const dirX = Math.cos(player.ang), dirY = Math.sin(player.ang);
+  bullets.push({ x: mx, y: my, dirX, dirY, speed: weapon.bulletSpeed, radius: weapon.bulletRadiusPx, ttl: weapon.bulletTTL });
   lastShotTs = performance.now();
-  // placeholder: can be replaced with actual shooting logic (spawn projectile, raycast, etc.)
-  // For now, a quick visual & sound hook
-  // console.log('FIRE');
 }
 
-/* TOUCH INPUT: joystick (left), look (right swipe), fire (button DOM) */
-/* Only handle pointerType !== 'mouse' to enforce touch-only control */
+/* pointer handlers for fire button (touch only) */
+fireBtn.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse') return;
+  try{ fireBtn.setPointerCapture(e.pointerId); }catch(_){}
+  spawnBullet();
+});
+fireBtn.addEventListener('pointerup', (e) => { try{ fireBtn.releasePointerCapture(e.pointerId); }catch(_){ } });
+fireBtn.addEventListener('pointercancel', (e) => { try{ fireBtn.releasePointerCapture(e.pointerId); }catch(_){ } });
+
+/* ===== TOUCH INPUT: separation of left stick and right swipe ===== */
+/* pointerdown on canvas decides: left stick (by proximity to stick center) OR right-side look */
 canvas.addEventListener('pointerdown', (e) => {
   if (paused) return;
   if (e.pointerType === 'mouse') return;
   const x = e.clientX, y = e.clientY, w = window.innerWidth;
-  // If pointer is inside fire button bounding rect, ignore here (fire handled by DOM element)
   const fireRect = fireBtn.getBoundingClientRect();
   if (x >= fireRect.left && x <= fireRect.right && y >= fireRect.top && y <= fireRect.bottom) {
-    // let fireBtn handle it
+    // let fire button handle it
     return;
   }
-  // decide stick vs look: left half is for stick; right half for look
+  // compute stick center freshly (in case settings changed)
+  const sc = getStickCenterPx();
+  const distToStick = Math.hypot(x - sc.x, y - sc.y);
+  const hitCircle = distToStick <= Math.max( (stickState.radius || 60) * 1.25, 80 );
   const inLeft = x <= w * 0.5;
-  const distToStick = Math.hypot(x - stickState.centerX, y - stickState.centerY);
-  const hitCircle = distToStick <= Math.max(stickState.radius * 1.4, 80);
   if ((inLeft || hitCircle) && activeStickId === null) {
     activeStickId = e.pointerId;
     stickState.pressed = true;
+    stickState.centerX = sc.x; stickState.centerY = sc.y; // ensure it's exact
     // clamp knob
     const dx = x - stickState.centerX, dy = y - stickState.centerY, d = Math.hypot(dx,dy), max = stickState.radius;
     let kx = x, ky = y;
-    if (d > max) { kx = stickState.centerX + dx * (max / d); ky = stickState.centerY + dy * (max / d); }
+    if (d > max){ kx = stickState.centerX + dx * (max / d); ky = stickState.centerY + dy * (max / d); }
     stickState.knobX = kx; stickState.knobY = ky;
     movement.forward = computeForwardFromKnob();
-    movement.turn = computeTurnFromKnob();
-    try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    movement.strafe = computeStrafeFromKnob();
+    // IMPORTANT: do NOT set movement.turn from left stick
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
     return;
   }
-  // otherwise start look
-  if (activeLookId === null) {
+  // otherwise start look on right side
+  if (activeLookId === null){
     startLook(e.pointerId, x);
-    try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
   }
 });
 
 canvas.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'mouse') return;
-  if (activeStickId !== null && e.pointerId === activeStickId && stickState.pressed) {
+  if (activeStickId !== null && e.pointerId === activeStickId && stickState.pressed){
     const x = e.clientX, y = e.clientY;
     const dx = x - stickState.centerX, dy = y - stickState.centerY, dist = Math.hypot(dx,dy), max = stickState.radius;
     let kx = x, ky = y;
-    if (dist > max) { kx = stickState.centerX + dx * (max / dist); ky = stickState.centerY + dy * (max / dist); }
+    if (dist > max){ kx = stickState.centerX + dx * (max / dist); ky = stickState.centerY + dy * (max / dist); }
     stickState.knobX = kx; stickState.knobY = ky;
     movement.forward = computeForwardFromKnob();
-    movement.turn = computeTurnFromKnob();
+    movement.strafe = computeStrafeFromKnob();
     return;
   }
-  if (activeLookId !== null && e.pointerId === activeLookId) {
+  if (activeLookId !== null && e.pointerId === activeLookId){
     moveLook(e.clientX);
     return;
   }
@@ -259,44 +409,28 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerup', (e) => {
   if (e.pointerType === 'mouse') return;
-  if (e.pointerId === activeStickId) {
-    releaseStick(e.pointerId);
+  if (e.pointerId === activeStickId){
+    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+    activeStickId = null; stickState.pressed = false; movement.forward = 0; movement.strafe = 0;
+    stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
     return;
   }
-  if (e.pointerId === activeLookId) {
+  if (e.pointerId === activeLookId){
     endLook(e.pointerId);
-    try { canvas.releasePointerCapture(e.pointerId); } catch(_) {}
+    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
   }
 });
 canvas.addEventListener('pointercancel', (e) => {
   if (e.pointerType === 'mouse') return;
-  if (e.pointerId === activeStickId) releaseStick(e.pointerId);
-  if (e.pointerId === activeLookId) endLook(e.pointerId);
+  if (e.pointerId === activeStickId){
+    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+    activeStickId = null; stickState.pressed = false; movement.forward = 0; movement.strafe = 0;
+    stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
+  }
+  if (e.pointerId === activeLookId) { endLook(e.pointerId); }
 });
 
-function releaseStick(pid){
-  try { canvas.releasePointerCapture(pid); } catch(_) {}
-  if (activeStickId !== pid) return;
-  activeStickId = null; stickState.pressed = false; movement.forward = 0; movement.turn = 0;
-  stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
-}
-
-/* mapping helpers */
-function computeForwardFromKnob(){ const dy = (stickState.knobY - stickState.centerY); const norm = Math.max(1, stickState.radius); return Math.max(-1, Math.min(1, -(dy / norm))); }
-function computeTurnFromKnob(){ const dx = (stickState.knobX - stickState.centerX); const norm = Math.max(1, stickState.radius); return Math.max(-1.6, Math.min(1.6, (dx / norm) * 1.4)); }
-
-/* FIRE BUTTON DOM handlers */
-fireBtn.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse') return;
-  // prevent look from also starting if touching fire
-  // capture pointer on the button to ensure reliable up/cancel
-  try { fireBtn.setPointerCapture(e.pointerId); } catch(_) {}
-  doFire();
-});
-fireBtn.addEventListener('pointerup', (e) => { try { fireBtn.releasePointerCapture(e.pointerId); } catch(_) {} });
-fireBtn.addEventListener('pointercancel', (e) => { try { fireBtn.releasePointerCapture(e.pointerId); } catch(_) {} });
-
-/* SETTINGS UI BINDING */
+/* ===== SETTINGS UI BINDING (preview & pause) ===== */
 const overlay = document.getElementById('settingsOverlay');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsApply = document.getElementById('settingsApply');
@@ -319,10 +453,9 @@ const gfxRadios = document.getElementsByName('gfxPreset');
 function openSettings(){
   paused = true;
   // release any active pointers to avoid zалипание
-  if (activeStickId !== null) { try{ canvas.releasePointerCapture(activeStickId); }catch(_){} activeStickId = null; stickState.pressed=false; movement.forward=0; movement.turn=0; stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY; }
-  if (activeLookId !== null) { try{ canvas.releasePointerCapture(activeLookId); }catch(_){} activeLookId = null; }
+  if (activeStickId !== null){ try{ canvas.releasePointerCapture(activeStickId); }catch(_){} activeStickId=null; stickState.pressed=false; movement.forward=0; movement.strafe=0; stickState.knobX=stickState.centerX; stickState.knobY=stickState.centerY; }
+  if (activeLookId !== null){ try{ canvas.releasePointerCapture(activeLookId); }catch(_){} activeLookId=null; }
   overlay.style.display = 'flex';
-  // populate UI
   joyScaleInput.value = settings.joystick.scale;
   joySizeInput.value = settings.joystick.hitArea;
   fireSizeInput.value = settings.fire.size;
@@ -333,7 +466,16 @@ function openSettings(){
   updateFirePreviewFromSettings();
 }
 
-function closeSettings(apply=false){ overlay.style.display = 'none'; if (apply) { saveSettings(); resetStickFromSettings(); updateFireButtonPosition(); applyGraphicsPreset(); } paused = false; }
+function closeSettings(apply=false){
+  overlay.style.display = 'none';
+  if (apply){
+    saveSettings();
+    resetStickFromSettings();
+    updateFireButtonPosition();
+    applyGraphicsPreset();
+  }
+  paused = false;
+}
 
 settingsBtn.addEventListener('click', openSettings);
 settingsClose.addEventListener('click', ()=>closeSettings(false));
@@ -351,7 +493,6 @@ settingsApply.addEventListener('click', ()=>{
   applyGraphicsPreset();
   closeSettings(true);
 });
-
 resetDefaultsBtn.addEventListener('click', ()=>{
   settings = structuredClone(defaultSettings);
   joyScaleInput.value = settings.joystick.scale;
@@ -363,7 +504,7 @@ resetDefaultsBtn.addEventListener('click', ()=>{
   updateFirePreviewFromSettings();
 });
 
-/* PREVIEW DRAG: joystick */
+/* ===== PREVIEW DRAG: joystick (maps preview pos -> normalized 0..1) ===== */
 let previewDragStick = false;
 previewStick.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; previewDragStick = true; previewStick.setPointerCapture(e.pointerId); });
 window.addEventListener('pointermove', (e) => {
@@ -374,20 +515,19 @@ window.addEventListener('pointermove', (e) => {
   lx = Math.max(12, Math.min(rect.width-12, lx)); ly = Math.max(12, Math.min(rect.height-12, ly));
   previewStick.style.left = (lx - previewStick.offsetWidth/2) + 'px';
   previewStick.style.top = (ly - previewStick.offsetHeight/2) + 'px';
+  // map preview (0..1) to full screen normalized coordinates
   const relX = lx / rect.width;
-  settings.joystick.x_pct = Math.max(0.03, Math.min(0.45, relX * 0.45));
-  const relY = 1 - (ly / rect.height);
-  settings.joystick.y_pct = Math.max(0.55, Math.min(0.95, relY * 0.95));
+  const relY = ly / rect.height;
+  settings.joystick.x_pct = Math.max(0.02, Math.min(0.98, relX)); // normalized to full width
+  settings.joystick.y_pct = Math.max(0.02, Math.min(0.98, relY));
 });
 window.addEventListener('pointerup', (e) => { if (previewDragStick) { previewDragStick = false; try{ previewStick.releasePointerCapture(e.pointerId); }catch(_){} } });
 
 function updatePreviewFromSettings(){
   const preview = document.getElementById('joystickPreview');
   const rect = preview.getBoundingClientRect();
-  const relX = Math.min(1, settings.joystick.x_pct / 0.45);
-  const relY = 1 - ((settings.joystick.y_pct - 0.55) / 0.4);
-  const px = Math.max(18, Math.min(rect.width-18, relX * rect.width));
-  const py = Math.max(18, Math.min(rect.height-18, relY * rect.height));
+  const px = Math.max(18, Math.min(rect.width-18, settings.joystick.x_pct * rect.width));
+  const py = Math.max(18, Math.min(rect.height-18, settings.joystick.y_pct * rect.height));
   previewStick.style.left = (px - previewStick.offsetWidth/2) + 'px';
   previewStick.style.top  = (py - previewStick.offsetHeight/2) + 'px';
   previewStick.style.transform = `scale(${Math.max(0.6, Math.min(1.6, settings.joystick.scale))})`;
@@ -395,7 +535,7 @@ function updatePreviewFromSettings(){
   joySizeInput.value = settings.joystick.hitArea;
 }
 
-/* PREVIEW DRAG: fire */
+/* ===== PREVIEW DRAG: fire (maps preview pos -> normalized 0..1) ===== */
 let previewDragFire = false;
 previewFire.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; previewDragFire = true; previewFire.setPointerCapture(e.pointerId); });
 window.addEventListener('pointermove', (e) => {
@@ -406,23 +546,19 @@ window.addEventListener('pointermove', (e) => {
   lx = Math.max(12, Math.min(rect.width-12, lx)); ly = Math.max(12, Math.min(rect.height-12, ly));
   previewFire.style.left = (lx - previewFire.offsetWidth/2) + 'px';
   previewFire.style.top = (ly - previewFire.offsetHeight/2) + 'px';
-  // map preview (0..1) to right-side screen percentage (0.55..0.98)
   const relX = lx / rect.width;
-  const mappedX = 0.55 + relX * 0.4; // maps to 0.55..0.95
-  settings.fire.x_pct = Math.max(0.6, Math.min(0.98, mappedX));
   const relY = ly / rect.height;
-  settings.fire.y_pct = Math.max(0.18, Math.min(0.92, relY));
+  // map preview relX to right-side normalized region (but keep full 0..1 for simplicity)
+  settings.fire.x_pct = Math.max(0.02, Math.min(0.98, relX));
+  settings.fire.y_pct = Math.max(0.02, Math.min(0.98, relY));
 });
 window.addEventListener('pointerup', (e) => { if (previewDragFire) { previewDragFire = false; try{ previewFire.releasePointerCapture(e.pointerId); }catch(_){} } });
 
 function updateFirePreviewFromSettings(){
   const preview = document.getElementById('firePreview');
   const rect = preview.getBoundingClientRect();
-  // reverse map: settings.fire.x_pct (0.55..0.95) -> preview relX (0..1)
-  const relX = Math.min(1, Math.max(0, (settings.fire.x_pct - 0.55) / 0.4));
-  const relY = Math.min(1, Math.max(0, settings.fire.y_pct));
-  const px = Math.max(18, Math.min(rect.width-18, relX * rect.width));
-  const py = Math.max(18, Math.min(rect.height-18, relY * rect.height));
+  const px = Math.max(18, Math.min(rect.width-18, settings.fire.x_pct * rect.width));
+  const py = Math.max(18, Math.min(rect.height-18, settings.fire.y_pct * rect.height));
   previewFire.style.left = (px - previewFire.offsetWidth/2) + 'px';
   previewFire.style.top  = (py - previewFire.offsetHeight/2) + 'px';
   previewFire.style.width = Math.max(30, Math.min(120, settings.fire.size * 0.6)) + 'px';
@@ -437,10 +573,17 @@ fireSizeInput.addEventListener('input', (e) => { previewFire.style.width = Math.
 /* close overlay by tapping outside */
 overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSettings(false); });
 
-/* INIT */
+/* ===== INITIALIZE ===== */
 function init(){
   applyGraphicsPreset();
-  window.addEventListener('resize', ()=>{ applyGraphicsPreset(); resetStickFromSettings(); updatePreviewFromSettings(); updateFirePreviewFromSettings(); updateFireButtonPosition(); });
+  window.addEventListener('resize', ()=>{
+    DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    applyGraphicsPreset();
+    resetStickFromSettings();
+    updatePreviewFromSettings();
+    updateFirePreviewFromSettings();
+    updateFireButtonPosition();
+  });
   updatePreviewFromSettings();
   updateFirePreviewFromSettings();
   resetStickFromSettings();
@@ -451,10 +594,15 @@ init();
 applyGraphicsPreset();
 saveSettings();
 
-/* expose render function that integrates overlays */
-function render(){ renderBase(); drawStickOverlay(); }
-
-/* end */
+/* main render wrapper */
+function render(){
+  renderBase();
+  // overlays
+  drawStickOverlay();
+  drawCrosshair();
+  drawProjectilesAndEffects();
+}
 </script>
 </body>
 </html>
+ 
