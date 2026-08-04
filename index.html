@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Skeleton Shooter</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; color: #fff; }
+        canvas { display: block; background: #000; }
+        #debug-log {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 10px;
+            overflow: auto;
+            white-space: pre-wrap;
+            z-index: 1000;
+            display: none; /* Скрыто по умолчанию, показать по двойному тапу */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="debug-log"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const debugLog = document.getElementById('debug-log');
+        let logBuffer = [];
+
+        function appendLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const fullMessage = `${timestamp}: ${message}`;
+            console.log(fullMessage);
+            logBuffer.push(fullMessage);
+            if (logBuffer.length > 50) { // Ограничиваем буфер, чтобы не перегружать память
+                logBuffer.shift();
+            }
+            debugLog.textContent = logBuffer.join('\n');
+            debugLog.scrollTop = debugLog.scrollHeight; // Прокручиваем вниз
+        }
+
+        appendLog("Game script started.");
+        appendLog(`User Agent: ${navigator.userAgent}`);
+        appendLog(`Window dimensions: ${window.innerWidth}x${window.innerHeight}`);
+        appendLog(`Device pixel ratio: ${window.devicePixelRatio}`);
+
+        let gameRunning = false; // Флаг для управления циклом игры
+        let player = { x: 0, y: 0, width: 50, height: 50, speed: 5, color: 'blue' };
+        let bullets = [];
+        let enemies = [];
+        let score = 0;
+        let lastTouch = { x: 0, y: 0 };
+        let touchActive = false;
+        let animationFrameId = null;
+
+        // Инициализация Canvas
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - player.height * 2;
+            appendLog(`Canvas initialized: ${canvas.width}x${canvas.height}`);
+            if (!gameRunning) {
+                gameRunning = true;
+                gameLoop(); // Запускаем игровой цикл только после инициализации
+            }
+        }
+
+        window.addEventListener('resize', initCanvas);
+
+        // Инициализация игры
+        function initGame() {
+            enemies = []; // Очищаем врагов при инициализации
+            score = 0;
+            appendLog("Game initialized.");
+            initCanvas(); // Инициализация canvas должна быть первой
+        }
+
+        // Рисование объектов
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function drawBullets() {
+            bullets.forEach(bullet => {
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+        }
+
+        function drawEnemies() {
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+            });
+        }
+
+        function drawScore() {
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + score, 10, 30);
+        }
+
+        // Обновление состояния игры
+        function update() {
+            if (!gameRunning) return; // Останавливаем обновление, если игра не запущена
+
+            // Движение игрока (остаётся для сенсорного управления)
+            if (touchActive) {
+                const targetX = lastTouch.x - player.width / 2;
+                const dx = targetX - player.x;
+                if (Math.abs(dx) > player.speed) {
+                    player.x += Math.sign(dx) * player.speed;
+                } else {
+                    player.x = targetX;
+                }
+                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            }
+
+            // Движение пуль
+            bullets.forEach((bullet, index) => {
+                bullet.y -= bullet.speed;
+                if (bullet.y < 0) {
+                    bullets.splice(index, 1);
+                }
+            });
+
+            // Движение врагов и их столкновения
+            enemies.forEach((enemy, enemyIndex) => {
+                enemy.y += enemy.speed;
+                if (enemy.y > canvas.height) {
+                    enemies.splice(enemyIndex, 1);
+                    // Проигрыш при пропуске врага, или просто продолжаем игру
+                    // appendLog("Enemy passed, game over or continue.");
+                }
+
+                bullets.forEach((bullet, bulletIndex) => {
+                    if (
+                        bullet.x < enemy.x + enemy.width &&
+                        bullet.x + bullet.width > enemy.x &&
+                        bullet.y < enemy.y + enemy.height &&
+                        bullet.y + bullet.height > enemy.y
+                    ) {
+                        // Столкновение пули и врага
+                        bullets.splice(bulletIndex, 1);
+                        enemies.splice(enemyIndex, 1);
+                        score += 10;
+                        appendLog(`Hit! Score: ${score}`);
+                    }
+                });
+
+                // Столкновение игрока и врага
+                if (
+                    player.x < enemy.x + enemy.width &&
+                    player.x + player.width > enemy.x &&
+                    player.y < enemy.y + enemy.height &&
+                    player.y + player.height > enemy.y
+                ) {
+                    appendLog("Player hit by enemy! Game Over!");
+                    gameRunning = false; // Останавливаем игру
+                    cancelAnimationFrame(animationFrameId); // Останавливаем цикл
+                    alert('Game Over! Score: ' + score + '\nRefresh to play again.');
+                    // Для дебага не перезагружаем сразу, чтобы видеть логи
+                }
+            });
+
+            // Спавн врагов
+            if (Math.random() < 0.02) { // Шанс спавна врага
+                enemies.push({
+                    x: Math.random() * (canvas.width - 40),
+                    y: -40,
+                    width: 40,
+                    height: 40,
+                    speed: Math.random() * 2 + 1,
+                    color: 'red'
+                });
+            }
+        }
+
+        // Основной игровой цикл
+        function gameLoop() {
+            if (!gameRunning) {
+                appendLog("Game loop stopped.");
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Очистка
+            update(); // Обновление
+            drawPlayer(); // Отрисовка
+            drawBullets();
+            drawEnemies();
+            drawScore();
+
+            animationFrameId = requestAnimationFrame(gameLoop); // Следующий кадр
+        }
+
+        // Обработчики событий касания
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Предотвратить прокрутку/масштабирование
+            appendLog(`Touch started at ${e.touches[0].clientX}, ${e.touches[0].clientY}`);
+            touchActive = true;
+            lastTouch.x = e.touches[0].clientX;
+            lastTouch.y = e.touches[0].clientY;
+
+            // Выстрел
+            bullets.push({
+                x: player.x + player.width / 2 - 2.5,
+                y: player.y,
+                width: 5,
+                height: 10,
+                speed: 7
+            });
+            appendLog("Bullet fired.");
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Предотвратить прокрутку/масштабирование
+            if (touchActive) {
+                lastTouch.x = e.touches[0].clientX;
+                lastTouch.y = e.touches[0].clientY;
+                appendLog(`Touch moved to ${lastTouch.x}, ${lastTouch.y}`);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            appendLog("Touch ended.");
+            touchActive = false;
+        });
+
+        // Добавляем двойной тап для показа/скрытия логов
+        let lastTap = 0;
+        canvas.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 300 && tapLength > 0) {
+                debugLog.style.display = debugLog.style.display === 'none' ? 'block' : 'none';
+                appendLog(`Debug log visibility toggled to ${debugLog.style.display}`);
+            }
+            lastTap = currentTime;
+        });
+
+
+        // Запуск игры
+        appendLog("Calling initGame()...");
+        initGame();
+        appendLog("initGame() called.");
+
+        // В случае, если gameLoop не стартует сразу
+        setTimeout(() => {
+            if (!gameRunning && animationFrameId === null) {
+                appendLog("Game loop did not start. Attempting restart...");
+                gameRunning = true;
+                gameLoop();
+            }
+        }, 1000); // Проверка через 1 секунду
+
+    </script>
+</body>
+</html>
