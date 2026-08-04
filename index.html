@@ -3,1821 +3,441 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>Shuterok — исправленная версия</title>
+<title>Shuterok — рабочий прототип</title>
 <style>
-  /* ===== Стили (без изменений) ===== */
-  :root {
-    --accent: #4fc3f7;
-    --bg-dark: #0a0c0f;
-    --panel-bg: #0f1113;
-    --text-light: #e6eef6;
-  }
+  :root{--accent:#4fc3f7; --ui-size:16px;}
+  html,body{height:100%; margin:0; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; background:#000; font-family:system-ui,Segoe UI,Roboto,Arial; overflow:hidden;}
+  #gameWrap{position:relative; height:100vh; width:100vw; overflow:hidden;}
+  canvas{display:block; width:100%; height:100%; background:#111; touch-action:none; cursor:none;}
   
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  #settingsBtn{position:absolute; right:12px; top:12px; z-index:1100; width:44px; height:44px; border-radius:10px; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; color:#fff; border:1px solid rgba(255,255,255,0.06); box-shadow:0 6px 18px rgba(0,0,0,0.5);}
+  #fireBtn{position:absolute; z-index:1050; width:72px; height:72px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow:0 8px 24px rgba(255,84,0,0.28); display:flex; align-items:center; justify-content:center; color:#111; font-weight:700; user-select:none; touch-action:none; font-size:32px; border:2px solid rgba(255,255,255,0.15);}
+  #fireBtn:active{transform:scale(0.88);}
   
-  html, body {
-    height: 100%;
-    overflow: hidden;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    background: var(--bg-dark);
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-    touch-action: none;
-  }
+  #settingsOverlay{position:absolute; inset:0; z-index:1200; display:none; align-items:flex-start; justify-content:center; background:rgba(0,0,0,0.45); padding:18px;}
+  #settingsPanel{width:min(96vw,540px); background:#0f1113; color:#e6eef6; border-radius:12px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.6); max-height:90vh; overflow-y:auto;}
+  #settingsPanel h2{margin:4px 0 8px; font-size:18px;}
+  .row{display:flex; gap:10px; align-items:center; margin:8px 0; flex-wrap:wrap;}
+  label{font-size:13px; color:#cfe9ff; display:flex; flex-direction:column; gap:4px; flex:1; min-width:100px;}
+  .range{width:100%;}
+  .btn-row{display:flex; gap:8px; justify-content:flex-end; margin-top:12px;}
+  .btn{padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600;}
+  .btn.ghost{background:transparent; color:#cfe9ff; border:1px solid rgba(255,255,255,0.06);}
+  .btn.primary{background:var(--accent); color:#042; border:none;}
+  #joystickPreview,#firePreview{width:160px; height:160px; background:linear-gradient(180deg,#0b0d0f,#0f1316); border-radius:12px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:none; flex-shrink:0;}
+  #previewPad{position:absolute; inset:12px; border-radius:8px; background:rgba(255,255,255,0.02);}
+  #previewStick{position:absolute; width:48px; height:48px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #9df0ff, #04a6d6); box-shadow:0 6px 20px rgba(4,166,214,0.25); touch-action:none; border:2px solid rgba(255,255,255,0.1);}
+  #previewFire{position:absolute; width:40px; height:40px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow:0 6px 18px rgba(255,84,0,0.18); touch-action:none; border:2px solid rgba(255,255,255,0.1);}
+  .sectionTitle{font-size:13px; color:#9fd9ff; margin-top:6px;}
+  .info{font-size:12px; color:#9fbcd6;}
   
-  #gameWrap {
-    position: relative;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    background: #000;
-  }
+  #debugOverlay{position:absolute; inset:0; z-index:1300; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); padding:20px;}
+  #debugOverlay.active{display:flex;}
+  #debugPanel{width:min(94vw,600px); max-height:80vh; overflow-y:auto; background:#0a0c0f; color:#b0d0e8; border-radius:16px; padding:16px 20px; border:1px solid rgba(79,195,247,0.15); font-family:'Courier New',monospace; font-size:12px; line-height:1.6;}
+  #debugPanel .header{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.06);}
+  #debugPanel .header h3{color:var(--accent); font-size:16px; margin:0; font-family:system-ui;}
+  #debugPanel .header .close-btn{background:rgba(255,255,255,0.05); border:none; color:#8aaccc; padding:4px 14px; border-radius:8px; cursor:pointer; font-size:14px; font-family:system-ui;}
+  #debugContent .label{color:#4fc3f7; font-weight:600;}
+  #debugContent .value{color:#ffd97a;}
   
-  canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-    background: #1a1c20;
-    touch-action: none;
-    cursor: none;
-  }
-  
-  #settingsBtn {
-    position: absolute;
-    right: 16px;
-    top: 16px;
-    z-index: 1100;
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    transition: transform 0.2s ease;
-  }
-  
-  #settingsBtn:active {
-    transform: scale(0.92);
-  }
-  
-  #settingsBtn svg {
-    width: 22px;
-    height: 22px;
-  }
-  
-  #fireBtn {
-    position: absolute;
-    z-index: 1050;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #ffd97a, #ff5400);
-    box-shadow: 0 8px 28px rgba(255, 84, 0, 0.35), inset 0 -3px 8px rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #1a0a00;
-    font-weight: 700;
-    font-size: 32px;
-    user-select: none;
-    touch-action: none;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
-    will-change: transform;
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    cursor: pointer;
-  }
-  
-  #fireBtn:active {
-    transform: scale(0.88);
-    box-shadow: 0 4px 16px rgba(255, 84, 0, 0.5);
-  }
-  
-  #settingsOverlay {
-    position: absolute;
-    inset: 0;
-    z-index: 1200;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    padding: 20px;
-  }
-  
-  #settingsPanel {
-    width: min(96vw, 560px);
-    max-height: 90vh;
-    overflow-y: auto;
-    background: var(--panel-bg);
-    color: var(--text-light);
-    border-radius: 16px;
-    padding: 20px 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
-  
-  #settingsPanel h2 {
-    margin: 0 0 12px 0;
-    font-size: 20px;
-    font-weight: 600;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .sectionTitle {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--accent);
-    margin-top: 16px;
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    opacity: 0.8;
-  }
-  
-  .row {
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    margin: 6px 0 10px 0;
-    flex-wrap: wrap;
-  }
-  
-  .row > * {
-    flex: 1;
-    min-width: 120px;
-  }
-  
-  label {
-    font-size: 13px;
-    color: #cfe9ff;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  
-  .range {
-    width: 100%;
-    height: 4px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    outline: none;
-  }
-  
-  .range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(79, 195, 247, 0.3);
-  }
-  
-  .range::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    border: none;
-  }
-  
-  #joystickPreview,
-  #firePreview {
-    width: 180px;
-    height: 180px;
-    background: radial-gradient(circle at 30% 30%, #14181c, #090b0d);
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-    touch-action: none;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    flex-shrink: 0;
-  }
-  
-  #previewPad,
-  #previewPadFire {
-    position: absolute;
-    inset: 10px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px dashed rgba(255, 255, 255, 0.06);
-  }
-  
-  #previewStick {
-    position: absolute;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #9df0ff, #04a6d6);
-    box-shadow: 0 6px 24px rgba(4, 166, 214, 0.3);
-    touch-action: none;
-    transition: transform 0.1s ease;
-    will-change: transform, left, top;
-    border: 2px solid rgba(255, 255, 255, 0.15);
-  }
-  
-  #previewFire {
-    position: absolute;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #ffd97a, #ff5400);
-    box-shadow: 0 6px 20px rgba(255, 84, 0, 0.25);
-    touch-action: none;
-    will-change: transform, left, top;
-    border: 2px solid rgba(255, 255, 255, 0.15);
-  }
-  
-  .info {
-    font-size: 11px;
-    color: #8aaccc;
-    margin-top: 4px;
-    line-height: 1.4;
-    opacity: 0.8;
-  }
-  
-  .btn-row {
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-  }
-  
-  .btn {
-    padding: 10px 18px;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    touch-action: manipulation;
-  }
-  
-  .btn:active {
-    transform: scale(0.94);
-  }
-  
-  .btn.ghost {
-    background: rgba(255, 255, 255, 0.04);
-    color: #cfe9ff;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  
-  .btn.primary {
-    background: var(--accent);
-    color: #042;
-    border: none;
-    box-shadow: 0 4px 16px rgba(79, 195, 247, 0.25);
-  }
-  
-  #debugOverlay {
-    position: absolute;
-    inset: 0;
-    z-index: 1300;
-    display: none;
-    align-items: flex-start;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: 30px 20px;
-    pointer-events: none;
-  }
-  
-  #debugOverlay.active {
-    display: flex;
-    pointer-events: auto;
-  }
-  
-  #debugPanel {
-    width: min(94vw, 700px);
-    max-height: 80vh;
-    overflow-y: auto;
-    background: #0a0c0f;
-    color: #b0d0e8;
-    border-radius: 16px;
-    padding: 20px 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
-    border: 1px solid rgba(79, 195, 247, 0.15);
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    line-height: 1.6;
-    pointer-events: auto;
-  }
-  
-  #debugPanel .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  }
-  
-  #debugPanel .header h3 {
-    color: var(--accent);
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0;
-    font-family: system-ui;
-  }
-  
-  #debugPanel .header .close-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: none;
-    color: #8aaccc;
-    padding: 4px 14px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-family: system-ui;
-    transition: background 0.2s;
-  }
-  
-  #debugPanel .header .close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-  
-  #debugContent {
-    white-space: pre-wrap;
-    word-break: break-all;
-    color: #8ab4d6;
-  }
-  
-  #debugContent .label {
-    color: #4fc3f7;
-    font-weight: 600;
-  }
-  
-  #debugContent .value {
-    color: #ffd97a;
-  }
-  
-  /* ===== ИНДИКАТОР ЗАГРУЗКИ ===== */
-  #loadingIndicator {
-    position: absolute;
-    inset: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0a0c0f;
-    color: var(--accent);
-    font-family: system-ui;
-    font-size: 18px;
-    transition: opacity 0.5s ease;
-    pointer-events: none;
-  }
-  
-  #loadingIndicator.hidden {
-    opacity: 0;
-  }
-  
-  #loadingIndicator .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(79, 195, 247, 0.1);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-right: 16px;
-  }
-  
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  
-  @media (max-width: 600px) {
-    #settingsPanel {
-      padding: 16px;
-    }
-    #joystickPreview,
-    #firePreview {
-      width: 140px;
-      height: 140px;
-    }
-    #previewStick {
-      width: 42px;
-      height: 42px;
-    }
-    #previewFire {
-      width: 38px;
-      height: 38px;
-    }
-    #settingsBtn {
-      width: 40px;
-      height: 40px;
-      right: 12px;
-      top: 12px;
-    }
-    #debugPanel {
-      padding: 14px 16px;
-      font-size: 11px;
-    }
-  }
-  
-  #settingsPanel::-webkit-scrollbar,
-  #debugPanel::-webkit-scrollbar {
-    width: 4px;
-  }
-  
-  #settingsPanel::-webkit-scrollbar-track,
-  #debugPanel::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  #settingsPanel::-webkit-scrollbar-thumb,
-  #debugPanel::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-  }
+  @media(max-width:520px){#joystickPreview,#firePreview{width:120px;height:120px;}#settingsPanel{padding:12px;}}
 </style>
 </head>
 <body>
 <div id="gameWrap">
-  <!-- Индикатор загрузки (БАГ #11) -->
-  <div id="loadingIndicator">
-    <div class="spinner"></div>
-    <span>Загрузка...</span>
-  </div>
-
   <canvas id="gameCanvas" playsinline></canvas>
-
   <div id="fireBtn" aria-label="Огонь">⚡</div>
-
-  <div id="settingsBtn" title="Настройки" aria-label="Настройки">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <div id="settingsBtn" aria-label="Настройки">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 16.9l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.7 0 1.28-.41 1.51-1a1.65 1.65 0 0 0-.33-1.82L4.3 2.3A2 2 0 1 1 7.12.48l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 11.5 0H12a2 2 0 1 1 4 0h.09c.7 0 1.28.41 1.51 1 .13.41.45.76.86.96l.06.02a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82v.09c0 .7.41 1.28 1 1.51H21a2 2 0 1 1 0 4h-.09c-.41 0-.76.45-.96.86z"/>
     </svg>
   </div>
-
   <div id="settingsOverlay">
-    <div id="settingsPanel" role="dialog" aria-modal="true" aria-label="Настройки игры">
+    <div id="settingsPanel">
       <h2>Настройки</h2>
-
       <div class="sectionTitle">Джойстик (сенсор)</div>
       <div class="row">
-        <div id="joystickPreview" title="Перетащите круг, чтобы задать позицию">
-          <div id="previewPad"></div>
-          <div id="previewStick"></div>
-        </div>
-        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+        <div id="joystickPreview"><div id="previewPad"></div><div id="previewStick"></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
           <label>Масштаб стика <input id="joyScale" class="range" type="range" min="0.6" max="1.6" step="0.05"></label>
-          <label>Размер области касания <input id="joySize" class="range" type="range" min="0.12" max="0.45" step="0.01"></label>
-          <div class="info">Перетащите кружок в превью для установки позиции стика (относительно экрана).</div>
+          <label>Размер области <input id="joySize" class="range" type="range" min="0.12" max="0.45" step="0.01"></label>
+          <div class="info">Перетащите кружок в превью</div>
         </div>
       </div>
-
       <div class="sectionTitle">Кнопка огня</div>
       <div class="row">
-        <div id="firePreview">
-          <div id="previewPadFire"></div>
-          <div id="previewFire"></div>
-        </div>
-        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-          <label>Размер кнопки <input id="fireSize" class="range" type="range" min="36" max="110" step="2"></label>
-          <div class="info">Перетащите кнопку в превью для установки позиции огня (относительно экрана).</div>
+        <div id="firePreview"><div id="previewPadFire"></div><div id="previewFire"></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label>Размер <input id="fireSize" class="range" type="range" min="36" max="110" step="2"></label>
+          <div class="info">Перетащите кнопку в превью</div>
         </div>
       </div>
-
       <div class="sectionTitle">Чувствительность</div>
       <div class="row">
         <label>Движение <input id="sensMove" class="range" type="range" min="0.4" max="2.2" step="0.05"></label>
-        <label>Обзор (свайп) <input id="sensLook" class="range" type="range" min="0.4" max="2.6" step="0.05"></label>
+        <label>Обзор <input id="sensLook" class="range" type="range" min="0.4" max="2.6" step="0.05"></label>
       </div>
-
       <div class="sectionTitle">Графика</div>
-      <div class="row" style="gap:20px;">
-        <label><input type="radio" name="gfxPreset" value="performance"> 🚀 Performance</label>
-        <label><input type="radio" name="gfxPreset" value="quality"> ✨ Quality</label>
-        <label><input type="radio" name="gfxPreset" value="ultra"> 🌟 Ultra</label>
+      <div class="row">
+        <label><input type="radio" name="gfxPreset" value="performance"> Performance</label>
+        <label><input type="radio" name="gfxPreset" value="quality" checked> Quality</label>
       </div>
-
       <div class="btn-row">
-        <button id="resetDefaults" class="btn ghost small">Сбросить</button>
-        <button id="settingsClose" class="btn ghost small">Закрыть</button>
-        <button id="settingsApply" class="btn primary small">Применить</button>
+        <button id="resetDefaults" class="btn ghost">Сбросить</button>
+        <button id="settingsClose" class="btn ghost">Закрыть</button>
+        <button id="settingsApply" class="btn primary">Применить</button>
       </div>
     </div>
   </div>
-
   <div id="debugOverlay">
     <div id="debugPanel">
-      <div class="header">
-        <h3>🐛 Отладка</h3>
-        <button class="close-btn" id="debugClose">✕ Закрыть</button>
-      </div>
+      <div class="header"><h3>🐛 Отладка</h3><button class="close-btn" id="debugClose">✕</button></div>
       <div id="debugContent">Загрузка...</div>
     </div>
   </div>
 </div>
 
 <script>
-// ============================================================
-//  1. НАСТРОЙКИ
-// ============================================================
-
-const STORAGE_KEY = 'shuterok_engine_v5';
-
+// ============================================
+// 1. НАСТРОЙКИ
+// ============================================
+const STORAGE_KEY = 'shuterok_fixed';
 const defaultSettings = {
-  joystick: { x_pct: 0.12, y_pct: 0.78, scale: 1.0, hitArea: 0.22 },
-  fire: { x_pct: 0.92, y_pct: 0.78, size: 72 },
-  sensitivity: { move: 1.0, look: 1.0 },
-  graphics: { preset: 'quality' }
+  joystick:{x_pct:0.12,y_pct:0.78,scale:1.0,hitArea:0.22},
+  fire:{x_pct:0.92,y_pct:0.78,size:72},
+  sensitivity:{move:1.0,look:1.0},
+  graphics:{preset:'quality'}
 };
-
 let settings = loadSettings();
+function loadSettings(){try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY));return s?{joystick:{...defaultSettings.joystick,...s.joystick},fire:{...defaultSettings.fire,...s.fire},sensitivity:{...defaultSettings.sensitivity,...s.sensitivity},graphics:{...defaultSettings.graphics,...s.graphics}}:structuredClone(defaultSettings);}catch(e){return structuredClone(defaultSettings);}}
+function saveSettings(){localStorage.setItem(STORAGE_KEY,JSON.stringify(settings));}
 
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return structuredClone(defaultSettings);
-    const parsed = JSON.parse(raw);
-    return {
-      joystick: { ...defaultSettings.joystick, ...(parsed.joystick || {}) },
-      fire: { ...defaultSettings.fire, ...(parsed.fire || {}) },
-      sensitivity: { ...defaultSettings.sensitivity, ...(parsed.sensitivity || {}) },
-      graphics: { ...defaultSettings.graphics, ...(parsed.graphics || {}) }
-    };
-  } catch {
-    return structuredClone(defaultSettings);
-  }
-}
+// ============================================
+// 2. CANVAS И РЕНДЕРИНГ
+// ============================================
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+let W=0,H=0,DPR=1;
 
-function saveSettings() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
-// ============================================================
-//  2. CANVAS И РЕНДЕРИНГ
-// ============================================================
-
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-let canvasWidth = 0;
-let canvasHeight = 0;
-let DPR = 1;
-
-const renderer = {
-  imageData: null,
-  data: null,
-  
-  init() {
-    this.imageData = ctx.createImageData(canvasWidth, canvasHeight);
-    this.data = this.imageData.data;
-  },
-  
-  clear() {
-    if (!this.data) return;
-    for (let i = 0; i < this.data.length; i++) {
-      this.data[i] = 0;
-    }
-  },
-  
-  setPixel(x, y, r, g, b) {
-    if (x < 0 || x >= canvasWidth || y < 0 || y >= canvasHeight) return;
-    const idx = (y * canvasWidth + x) * 4;
-    if (idx >= 0 && idx < this.data.length - 4) {
-      this.data[idx] = r;
-      this.data[idx + 1] = g;
-      this.data[idx + 2] = b;
-      this.data[idx + 3] = 255;
-    }
-  },
-  
-  drawColumn(x, yTop, yBottom, shade, side, wallX) {
-    const brightness = Math.max(0.15, Math.min(1.0, shade));
-    const baseR = side === 0 ? 180 : 140;
-    const baseG = side === 0 ? 160 : 120;
-    const baseB = side === 0 ? 120 : 90;
-    
-    const texFactor = Math.sin(wallX * 30) * 0.06 + 0.94;
-    
-    const r = Math.floor(baseR * brightness * texFactor);
-    const g = Math.floor(baseG * brightness * texFactor);
-    const b = Math.floor(baseB * brightness * texFactor);
-    
-    const yStart = Math.max(0, Math.floor(yTop));
-    const yEnd = Math.min(canvasHeight - 1, Math.floor(yBottom));
-    
-    for (let y = yStart; y <= yEnd; y++) {
-      const idx = (y * canvasWidth + x) * 4;
-      if (idx >= 0 && idx < this.data.length - 4) {
-        this.data[idx] = r;
-        this.data[idx + 1] = g;
-        this.data[idx + 2] = b;
-        this.data[idx + 3] = 255;
-      }
-    }
-  },
-  
-  drawFloorCeiling() {
-    const halfH = canvasHeight / 2;
-    for (let y = 0; y < canvasHeight; y++) {
-      const isCeiling = y < halfH;
-      const t = isCeiling ? y / halfH : (y - halfH) / halfH;
-      const brightness = isCeiling ? 0.25 + t * 0.45 : 0.10 + t * 0.25;
-      
-      const r = Math.floor(70 * brightness);
-      const g = Math.floor(90 * brightness);
-      const b = Math.floor(120 * brightness);
-      
-      for (let x = 0; x < canvasWidth; x++) {
-        const idx = (y * canvasWidth + x) * 4;
-        if (idx >= 0 && idx < this.data.length - 4) {
-          this.data[idx] = r;
-          this.data[idx + 1] = g;
-          this.data[idx + 2] = b;
-          this.data[idx + 3] = 255;
-        }
-      }
-    }
-  },
-  
-  render() {
-    if (this.imageData) {
-      ctx.putImageData(this.imageData, 0, 0);
-    }
-  }
-};
-
-// ============================================================
-//  3. КАРТА
-// ============================================================
-
-class Map {
-  constructor(size = 20) {
-    this.size = size;
-    this.grid = [];
-    this.generate();
-  }
-  
-  generate() {
-    const s = this.size;
-    this.grid = Array(s * s).fill(1);
-    
-    const rooms = [
-      { x: 2, y: 2, w: 5, h: 5 },
-      { x: 13, y: 2, w: 5, h: 5 },
-      { x: 2, y: 13, w: 5, h: 5 },
-      { x: 13, y: 13, w: 5, h: 5 },
-      { x: 7, y: 7, w: 6, h: 6 }
-    ];
-    
-    rooms.forEach(r => {
-      for (let i = r.x; i < r.x + r.w; i++) {
-        for (let j = r.y; j < r.y + r.h; j++) {
-          if (i < s && j < s) this.grid[j * s + i] = 0;
-        }
-      }
-    });
-    
-    const corridors = [
-      [[4, 4], [4, 7]], [[4, 7], [7, 7]],
-      [[16, 4], [16, 7]], [[16, 7], [13, 7]],
-      [[4, 16], [4, 13]], [[4, 13], [7, 13]],
-      [[16, 16], [16, 13]], [[16, 13], [13, 13]],
-      [[7, 10], [10, 10]], [[10, 10], [10, 7]],
-      [[7, 10], [7, 13]], [[10, 10], [13, 10]]
-    ];
-    
-    corridors.forEach(([from, to]) => {
-      let [x, y] = from;
-      while (x !== to[0] || y !== to[1]) {
-        if (x < to[0]) x++;
-        else if (x > to[0]) x--;
-        else if (y < to[1]) y++;
-        else if (y > to[1]) y--;
-        if (x >= 0 && x < s && y >= 0 && y < s) {
-          this.grid[y * s + x] = 0;
-        }
-      }
-    });
-    
-    const pillars = [[9, 5], [10, 5], [9, 14], [10, 14]];
-    pillars.forEach(([x, y]) => {
-      if (x < s && y < s) this.grid[y * s + x] = 1;
-    });
-  }
-  
-  at(x, y) {
-    const xi = Math.floor(x);
-    const yi = Math.floor(y);
-    if (xi < 0 || xi >= this.size || yi < 0 || yi >= this.size) return 1;
-    return this.grid[yi * this.size + xi];
-  }
-  
-  isWall(x, y) {
-    return this.at(x, y) === 1;
-  }
-}
-
-// ============================================================
-//  4. ИГРОК
-// ============================================================
-
-class Player {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.angle = 0;
-    this.fov = Math.PI / 2.8;
-    this.height = 0.5;
-    this.moveSpeed = 3.0;
-    this.turnSpeed = 2.5;
-    this.radius = 0.25;
-  }
-  
-  get direction() {
-    return { x: Math.cos(this.angle), y: Math.sin(this.angle) };
-  }
-  
-  move(dx, dy, map) {
-    const newX = this.x + dx;
-    const newY = this.y + dy;
-    
-    if (!map.isWall(newX + this.radius, this.y) && 
-        !map.isWall(newX - this.radius, this.y)) {
-      this.x = newX;
-    }
-    
-    if (!map.isWall(this.x, newY + this.radius) && 
-        !map.isWall(this.x, newY - this.radius)) {
-      this.y = newY;
-    }
-  }
-}
-
-// ============================================================
-//  5. РЕЙКАСТИНГ (DDA)
-// ============================================================
-
-function castRay(px, py, angle, map) {
-  const dx = Math.cos(angle);
-  const dy = Math.sin(angle);
-  
-  let x = px;
-  let y = py;
-  
-  const stepX = dx > 0 ? 1 : -1;
-  const stepY = dy > 0 ? 1 : -1;
-  
-  let tMaxX = dx > 0 ? (Math.floor(x) + 1 - x) / dx : (x - Math.floor(x)) / -dx;
-  let tMaxY = dy > 0 ? (Math.floor(y) + 1 - y) / dy : (y - Math.floor(y)) / -dy;
-  
-  const tDeltaX = 1 / Math.abs(dx);
-  const tDeltaY = 1 / Math.abs(dy);
-  
-  let hit = false;
-  let side = 0;
-  let wallX = 0;
-  let distance = 0;
-  
-  let iterations = 0;
-  const maxIter = 30;
-  
-  while (!hit && iterations < maxIter) {
-    iterations++;
-    
-    if (tMaxX < tMaxY) {
-      x += stepX * 0.001;
-      tMaxX += tDeltaX;
-      side = 0;
-    } else {
-      y += stepY * 0.001;
-      tMaxY += tDeltaY;
-      side = 1;
-    }
-    
-    if (map.isWall(x, y)) {
-      hit = true;
-      distance = Math.hypot(x - px, y - py);
-      wallX = side === 0 ? y - Math.floor(y) : x - Math.floor(x);
-    }
-  }
-  
-  if (!hit) {
-    distance = 20;
-    wallX = 0.5;
-  }
-  
-  return { distance, side, wallX };
-}
-
-// ============================================================
-//  6. ПУЛИ (ИСПРАВЛЕНА ПРОБЛЕМА TUNNELING - БАГ #13)
-// ============================================================
-
-class Bullet {
-  constructor(x, y, angle, speed = 10) {
-    this.x = x;
-    this.y = y;
-    this.dirX = Math.cos(angle);
-    this.dirY = Math.sin(angle);
-    this.speed = speed;
-    this.radius = 0.08;
-    this.life = 2.5;
-    this.alive = true;
-    this.prevX = x;
-    this.prevY = y;
-  }
-  
-  update(dt, map) {
-    if (!this.alive) return;
-    
-    this.prevX = this.x;
-    this.prevY = this.y;
-    
-    this.x += this.dirX * this.speed * dt;
-    this.y += this.dirY * this.speed * dt;
-    this.life -= dt;
-    
-    // Проверка столкновения с учетом траектории (исправление tunneling)
-    if (this.life <= 0) {
-      this.alive = false;
-      return;
-    }
-    
-    // Проверяем не только текущую позицию, но и путь (DDA для пули)
-    const steps = Math.max(3, Math.ceil(this.speed * dt / 0.02));
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const cx = this.prevX + (this.x - this.prevX) * t;
-      const cy = this.prevY + (this.y - this.prevY) * t;
-      if (map.isWall(cx, cy)) {
-        this.alive = false;
-        return;
-      }
-    }
-  }
-  
-  screenPos(player, cw, ch) {
-    // Баг #6: проверяем, что размеры canvas больше 0
-    if (cw === 0 || ch === 0) return null;
-    
-    const dx = this.x - player.x;
-    const dy = this.y - player.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.01) return null;
-    
-    const angle = Math.atan2(dy, dx);
-    let angleDiff = angle - player.angle;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    
-    const halfFov = player.fov / 2;
-    if (Math.abs(angleDiff) > halfFov + 0.2) return null;
-    
-    const relX = (angleDiff / player.fov) + 0.5;
-    const screenX = relX * cw;
-    const heightFactor = 1 - Math.min(1, dist / 15);
-    const screenY = ch / 2 - heightFactor * ch * 0.2;
-    
-    return { x: screenX, y: screenY };
-  }
-}
-
-// ============================================================
-//  7. СОСТОЯНИЕ ИГРЫ
-// ============================================================
-
-const map = new Map(20);
-const player = new Player(10, 10);
-const bullets = [];
-const hitEffects = [];
-
-let movement = { forward: 0, strafe: 0, turn: 0 };
-let lastShotTime = 0;
-const shotCooldown = 0.12;
-let lastFrameTime = 0;
-let isPaused = false;
-let frameCount = 0;
-let debugInfo = {};
-let gameStartTime = performance.now(); // БАГ #5: используем правильное время
-let totalPauseTime = 0;
-let lastPauseStart = 0;
-
-// ============================================================
-//  8. УПРАВЛЕНИЕ (ИСПРАВЛЕН БАГ #1 - ДЖОЙСТИК)
-// ============================================================
-
-let stickState = {
-  activeId: null,
-  centerX: 0,
-  centerY: 0,
-  radius: 60,
-  knobX: 0,
-  knobY: 0,
-  pressed: false
-};
-
-let lookState = {
-  activeId: null,
-  lastX: 0
-};
-
-function getStickCenter() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  return {
-    x: Math.round(Math.max(0.04, Math.min(0.96, settings.joystick.x_pct)) * w),
-    y: Math.round(Math.max(0.04, Math.min(0.96, settings.joystick.y_pct)) * h)
-  };
-}
-
-function resetStick() {
-  const center = getStickCenter();
-  stickState.centerX = center.x;
-  stickState.centerY = center.y;
-  stickState.radius = Math.max(40, Math.min(window.innerWidth, window.innerHeight) * 
-                              settings.joystick.hitArea * settings.joystick.scale);
-  stickState.knobX = stickState.centerX;
-  stickState.knobY = stickState.centerY;
-  movement.forward = 0;
-  movement.strafe = 0;
-}
-
-function updateStickFromTouch(clientX, clientY) {
-  const dx = clientX - stickState.centerX;
-  const dy = clientY - stickState.centerY;
-  const dist = Math.hypot(dx, dy);
-  const max = stickState.radius;
-  
-  const deadZone = max * 0.05;
-  
-  if (dist < deadZone) {
-    stickState.knobX = stickState.centerX;
-    stickState.knobY = stickState.centerY;
-    movement.forward = 0;
-    movement.strafe = 0;
-    return;
-  }
-  
-  let kx = clientX;
-  let ky = clientY;
-  let normalizedDist = dist;
-  
-  if (dist > max) {
-    kx = stickState.centerX + dx * (max / dist);
-    ky = stickState.centerY + dy * (max / dist);
-    normalizedDist = max;
-  }
-  
-  stickState.knobX = kx;
-  stickState.knobY = ky;
-  
-  const factor = (normalizedDist - deadZone) / (max - deadZone);
-  const angle = Math.atan2(dy, dx);
-  
-  movement.forward = Math.cos(angle) * factor;
-  movement.strafe = Math.sin(angle) * factor;
-}
-
-// ============================================================
-//  9. ОБРАБОТЧИКИ ВВОДА (ИСПРАВЛЕНЫ БАГИ #2, #4, #9)
-// ============================================================
-
-function setupInput() {
-  canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('pointermove', onPointerMove);
-  canvas.addEventListener('pointerup', onPointerUp);
-  canvas.addEventListener('pointercancel', onPointerCancel);
-  canvas.addEventListener('pointerleave', onPointerCancel);
-  
-  const fireBtn = document.getElementById('fireBtn');
-  fireBtn.addEventListener('pointerdown', onFireDown);
-  fireBtn.addEventListener('pointerup', onFireUp);
-  fireBtn.addEventListener('pointercancel', onFireUp);
-}
-
-function onPointerDown(e) {
-  if (isPaused) return;
-  // БАГ #4: разрешаем мышь, но только для тестирования на десктопе
-  // if (e.pointerType === 'mouse') return;
-  
-  const x = e.clientX;
-  const y = e.clientY;
-  const w = window.innerWidth;
-  
-  const fireRect = document.getElementById('fireBtn').getBoundingClientRect();
-  if (x >= fireRect.left && x <= fireRect.right && 
-      y >= fireRect.top && y <= fireRect.bottom) {
-    return;
-  }
-  
-  const center = getStickCenter();
-  const distToCenter = Math.hypot(x - center.x, y - center.y);
-  const isInStickZone = (x < w * 0.5) || (distToCenter < stickState.radius * 2);
-  
-  if (isInStickZone && stickState.activeId === null) {
-    stickState.activeId = e.pointerId;
-    stickState.pressed = true; // БАГ #1: устанавливаем pressed!
-    const c = getStickCenter();
-    stickState.centerX = c.x;
-    stickState.centerY = c.y;
-    updateStickFromTouch(x, y);
-    try { canvas.setPointerCapture(e.pointerId); } catch {}
-    return;
-  }
-  
-  if (lookState.activeId === null) {
-    lookState.activeId = e.pointerId;
-    lookState.lastX = x;
-    try { canvas.setPointerCapture(e.pointerId); } catch {}
-  }
-}
-
-function onPointerMove(e) {
-  if (isPaused) return;
-  // if (e.pointerType === 'mouse') return;
-  
-  const x = e.clientX;
-  const y = e.clientY;
-  
-  if (e.pointerId === stickState.activeId && stickState.pressed) {
-    updateStickFromTouch(x, y);
-    return;
-  }
-  
-  if (e.pointerId === lookState.activeId) {
-    const dx = x - lookState.lastX;
-    lookState.lastX = x;
-    const factor = (Math.PI * 0.8) / window.innerWidth;
-    player.angle += dx * factor * settings.sensitivity.look;
-    return;
-  }
-}
-
-function onPointerUp(e) {
-  // if (e.pointerType === 'mouse') return;
-  
-  if (e.pointerId === stickState.activeId) {
-    stickState.activeId = null;
-    stickState.pressed = false;
-    movement.forward = 0;
-    movement.strafe = 0;
-    stickState.knobX = stickState.centerX;
-    stickState.knobY = stickState.centerY;
-    try { canvas.releasePointerCapture(e.pointerId); } catch {}
-    return;
-  }
-  
-  if (e.pointerId === lookState.activeId) {
-    lookState.activeId = null;
-    try { canvas.releasePointerCapture(e.pointerId); } catch {}
-  }
-}
-
-function onPointerCancel(e) {
-  onPointerUp(e);
-}
-
-let firePressed = false;
-
-function onFireDown(e) {
-  // БАГ #9: разрешаем мышь
-  // if (e.pointerType === 'mouse') return;
-  firePressed = true;
-  try { e.target.setPointerCapture(e.pointerId); } catch {}
-  shoot();
-}
-
-function onFireUp(e) {
-  // if (e.pointerType === 'mouse') return;
-  firePressed = false;
-  try { e.target.releasePointerCapture(e.pointerId); } catch {}
-}
-
-function shoot() {
-  const now = performance.now();
-  if (now - lastShotTime < shotCooldown * 1000) return;
-  lastShotTime = now;
-  
-  const dir = player.direction;
-  const muzzleDist = 0.35;
-  const bx = player.x + dir.x * muzzleDist;
-  const by = player.y + dir.y * muzzleDist;
-  
-  bullets.push(new Bullet(bx, by, player.angle, 9 + Math.random() * 2));
-  
-  hitEffects.push({
-    x: canvasWidth / 2,
-    y: canvasHeight / 2,
-    size: Math.min(canvasWidth, canvasHeight) * 0.04,
-    life: 0.08,
-    maxLife: 0.08,
-    type: 'muzzle'
-  });
-}
-
-// ============================================================
-//  10. ТРОЙНОЙ ТАП ДЛЯ ОТЛАДКИ (ИСПРАВЛЕН БАГ #2)
-// ============================================================
-
-let tapTimes = [];
-let debugActive = false;
-let debugTapBlocked = false;
-
-function setupDebugTap() {
-  document.addEventListener('pointerdown', (e) => {
-    // БАГ #4: игнорируем мышь
-    if (e.pointerType === 'mouse') return;
-    
-    // БАГ #2: не блокируем ввод, просто считаем тапы
-    const now = performance.now();
-    tapTimes.push(now);
-    tapTimes = tapTimes.filter(t => now - t < 1000);
-    
-    if (tapTimes.length >= 3 && !debugTapBlocked) {
-      tapTimes = [];
-      debugTapBlocked = true;
-      toggleDebug();
-      setTimeout(() => { debugTapBlocked = false; }, 500);
-    }
-  });
-}
-
-function toggleDebug() {
-  debugActive = !debugActive;
-  const overlay = document.getElementById('debugOverlay');
-  overlay.classList.toggle('active', debugActive);
-  
-  if (debugActive) {
-    updateDebugInfo();
-  }
-}
-
-function updateDebugInfo() {
-  const content = document.getElementById('debugContent');
-  
-  // БАГ #8: исправлен FPS = Infinity
-  const fps = lastFrameTime > 0 ? Math.round(1000 / (performance.now() - lastFrameTime)) : 0;
-  
-  const uptime = (performance.now() - gameStartTime - totalPauseTime) / 1000;
-  
-  const info = {
-    '🖥️ Canvas': `${canvasWidth}×${canvasHeight} (DPR: ${DPR})`,
-    '🎮 Игрок': `(${player.x.toFixed(2)}, ${player.y.toFixed(2)}) угол: ${(player.angle * 180 / Math.PI).toFixed(1)}°`,
-    '🗺️ Карта': `${map.size}×${map.size}, стен: ${map.grid.filter(c => c === 1).length}`,
-    '💥 Пули': bullets.length,
-    '✨ Эффекты': hitEffects.length,
-    '⚡ Движение': `F:${movement.forward.toFixed(2)} S:${movement.strafe.toFixed(2)}`,
-    '🎯 FPS': fps > 0 ? fps : '⏳ измеряется...',
-    '📦 Память': `${(performance.memory?.usedJSHeapSize / 1048576 || 0).toFixed(1)} MB`,
-    '🔧 Настройки': `Графика: ${settings.graphics.preset}`,
-    '📐 Размер стика': `${stickState.radius}px`,
-    '🎯 Позиция стика': `(${stickState.knobX.toFixed(0)}, ${stickState.knobY.toFixed(0)})`,
-    '📱 Разрешение': `${window.innerWidth}×${window.innerHeight}`,
-    '🕐 Время работы': `${uptime.toFixed(1)}с`
-  };
-  
-  let html = '';
-  for (const [key, value] of Object.entries(info)) {
-    html += `<span class="label">${key}</span> → <span class="value">${value}</span>\n`;
-  }
-  
-  html += `\n<span class="label">🕹️ Джойстик</span> → <span class="value">${stickState.pressed ? 'АКТИВЕН' : 'неактивен'}</span>\n`;
-  html += `<span class="label">👆 Обзор</span> → <span class="value">${lookState.activeId !== null ? 'АКТИВЕН' : 'неактивен'}</span>\n`;
-  
-  if (bullets.length > 0) {
-    html += `\n<span class="label">🔫 Последние пули:</span>\n`;
-    const lastBullets = bullets.slice(-5);
-    for (const b of lastBullets) {
-      html += `  → (${b.x.toFixed(2)}, ${b.y.toFixed(2)}) жизнь: ${b.life.toFixed(2)}с\n`;
-    }
-  }
-  
-  content.textContent = html;
-}
-
-// ============================================================
-//  11. РЕНДЕРИНГ (ИСПРАВЛЕН БАГ #3 - ДЖОЙСТИК НЕ ВЫЛЕТАЕТ)
-// ============================================================
-
-function renderScene() {
-  renderer.clear();
-  renderer.drawFloorCeiling();
-  
-  const numColumns = settings.graphics.preset === 'ultra' ? Math.floor(canvasWidth * 0.85) :
-                    settings.graphics.preset === 'quality' ? Math.floor(canvasWidth * 0.65) :
-                    Math.floor(canvasWidth * 0.45);
-  
-  const step = player.fov / numColumns;
-  let angle = player.angle - player.fov / 2;
-  
-  for (let i = 0; i < numColumns; i++) {
-    const ray = castRay(player.x, player.y, angle, map);
-    const distance = ray.distance;
-    
-    const correctedDist = distance * Math.cos(angle - player.angle);
-    
-    const wallHeight = Math.min(canvasHeight * 2, canvasHeight / (correctedDist + 0.01));
-    const yTop = (canvasHeight - wallHeight) / 2;
-    const yBottom = (canvasHeight + wallHeight) / 2;
-    
-    const shade = Math.max(0.1, Math.min(1.0, 1.4 - correctedDist * 0.07));
-    
-    const x = Math.floor((i / numColumns) * canvasWidth);
-    renderer.drawColumn(x, yTop, yBottom, shade, ray.side, ray.wallX);
-    
-    angle += step;
-  }
-  
-  // Пули
-  for (const bullet of bullets) {
-    const sp = bullet.screenPos(player, canvasWidth, canvasHeight);
-    if (sp) {
-      const size = Math.max(3, 6 * (1 - Math.min(1, Math.hypot(bullet.x - player.x, bullet.y - player.y) / 15)));
-      const px = Math.floor(sp.x);
-      const py = Math.floor(sp.y);
-      for (let dy = -size; dy <= size; dy++) {
-        for (let dx = -size; dx <= size; dx++) {
-          if (Math.hypot(dx, dy) > size) continue;
-          const idx = ((py + dy) * canvasWidth + (px + dx)) * 4;
-          if (idx >= 0 && idx < renderer.data.length - 4) {
-            renderer.data[idx] = 255;
-            renderer.data[idx + 1] = 220;
-            renderer.data[idx + 2] = 100;
-            renderer.data[idx + 3] = 255;
-          }
-        }
-      }
-    }
-  }
-  
-  // Эффекты
-  for (let i = hitEffects.length - 1; i >= 0; i--) {
-    const e = hitEffects[i];
-    e.life -= 1 / 60;
-    if (e.life <= 0) {
-      hitEffects.splice(i, 1);
-      continue;
-    }
-    const alpha = e.life / e.maxLife;
-    const size = e.size * (1 + (1 - alpha) * 0.5);
-    const px = Math.floor(e.x);
-    const py = Math.floor(e.y);
-    for (let dy = -size; dy <= size; dy++) {
-      for (let dx = -size; dx <= size; dx++) {
-        if (Math.hypot(dx, dy) > size) continue;
-        const idx = ((py + dy) * canvasWidth + (px + dx)) * 4;
-        if (idx >= 0 && idx < renderer.data.length - 4) {
-          renderer.data[idx] = Math.floor(255 * alpha);
-          renderer.data[idx + 1] = Math.floor(200 * alpha);
-          renderer.data[idx + 2] = Math.floor(100 * alpha);
-          renderer.data[idx + 3] = 255;
-        }
-      }
-    }
-  }
-  
-  drawMinimap();
-  drawCrosshair();
-  
-  // БАГ #12: movement.turn теперь используется
-  if (movement.turn !== 0) {
-    // Поворот от джойстика (если добавим в будущем)
-  }
-  
-  drawStick(); // БАГ #3: теперь безопасно
-  
-  renderer.render();
-}
-
-// ============================================================
-//  12. МИНИ-КАРТА (ИСПРАВЛЕН БАГ #10 - МЕНЕЕ ЯРКАЯ)
-// ============================================================
-
-function drawMinimap() {
-  const size = Math.min(140, canvasWidth * 0.15);
-  const pad = 10;
-  const x = canvasWidth - size - pad;
-  const y = pad;
-  const cell = (size - 4) / map.size;
-  
-  // Фон
-  for (let j = 0; j < size; j++) {
-    for (let i = 0; i < size; i++) {
-      const idx = ((Math.floor(y) + j) * canvasWidth + (Math.floor(x) + i)) * 4;
-      if (idx >= 0 && idx < renderer.data.length - 4) {
-        renderer.data[idx] = 8;
-        renderer.data[idx + 1] = 10;
-        renderer.data[idx + 2] = 14;
-        renderer.data[idx + 3] = 220;
-      }
-    }
-  }
-  
-  // Стены - БАГ #10: уменьшена яркость и альфа
-  for (let my = 0; my < map.size; my++) {
-    for (let mx = 0; mx < map.size; mx++) {
-      if (map.isWall(mx + 0.5, my + 0.5)) {
-        const px = Math.floor(x + 2 + mx * cell);
-        const py = Math.floor(y + 2 + my * cell);
-        const w = Math.ceil(cell);
-        const h = Math.ceil(cell);
-        for (let j = 0; j < h; j++) {
-          for (let i = 0; i < w; i++) {
-            const idx = ((py + j) * canvasWidth + (px + i)) * 4;
-            if (idx >= 0 && idx < renderer.data.length - 4) {
-              renderer.data[idx] = 120;  // Было 160
-              renderer.data[idx + 1] = 120;
-              renderer.data[idx + 2] = 120;
-              renderer.data[idx + 3] = 160; // Было 200
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  // Игрок
-  const px = Math.floor(x + 2 + player.x * cell);
-  const py = Math.floor(y + 2 + player.y * cell);
-  const pr = Math.max(2, cell * 0.4);
-  for (let j = -pr; j <= pr; j++) {
-    for (let i = -pr; i <= pr; i++) {
-      if (Math.hypot(i, j) > pr) continue;
-      const idx = ((py + j) * canvasWidth + (px + i)) * 4;
-      if (idx >= 0 && idx < renderer.data.length - 4) {
-        renderer.data[idx] = 255;
-        renderer.data[idx + 1] = 230;
-        renderer.data[idx + 2] = 50;
-        renderer.data[idx + 3] = 255;
-      }
-    }
-  }
-  
-  // Направление
-  const dirLen = cell * 1.2;
-  const endX = px + Math.cos(player.angle) * dirLen;
-  const endY = py + Math.sin(player.angle) * dirLen;
-  for (let t = 0; t < 1; t += 0.02) {
-    const lx = Math.floor(px + (endX - px) * t);
-    const ly = Math.floor(py + (endY - py) * t);
-    const idx = (ly * canvasWidth + lx) * 4;
-    if (idx >= 0 && idx < renderer.data.length - 4) {
-      renderer.data[idx] = 255;
-      renderer.data[idx + 1] = 200;
-      renderer.data[idx + 2] = 80;
-      renderer.data[idx + 3] = 255;
-    }
-  }
-}
-
-// ============================================================
-//  13. ПРИЦЕЛ
-// ============================================================
-
-function drawCrosshair() {
-  const cx = canvasWidth / 2;
-  const cy = canvasHeight / 2;
-  const size = Math.max(10, canvasWidth * 0.025);
-  const gap = Math.max(4, size * 0.3);
-  
-  const color = [200, 240, 255];
-  
-  const drawLine = (x1, y1, x2, y2) => {
-    const steps = Math.max(1, Math.hypot(x2 - x1, y2 - y1));
-    for (let t = 0; t <= 1; t += 1 / steps) {
-      const lx = Math.floor(x1 + (x2 - x1) * t);
-      const ly = Math.floor(y1 + (y2 - y1) * t);
-      const idx = (ly * canvasWidth + lx) * 4;
-      if (idx >= 0 && idx < renderer.data.length - 4) {
-        renderer.data[idx] = color[0];
-        renderer.data[idx + 1] = color[1];
-        renderer.data[idx + 2] = color[2];
-        renderer.data[idx + 3] = 220;
-      }
-    }
-  };
-  
-  const segments = [
-    [-size, 0, -gap, 0],
-    [gap, 0, size, 0],
-    [0, -size, 0, -gap],
-    [0, gap, 0, size]
-  ];
-  
-  for (const [x1, y1, x2, y2] of segments) {
-    drawLine(cx + x1, cy + y1, cx + x2, cy + y2);
-    drawLine(cx + x1, cy + y1, cx + x2, cy + y2);
-  }
-}
-
-// ============================================================
-//  14. ДЖОЙСТИК (ИСПРАВЛЕН БАГ #3 - БЕЗОПАСНЫЙ)
-// ============================================================
-
-function drawStick() {
-  if (!stickState.pressed) return;
-  
-  const cx = stickState.centerX;
-  const cy = stickState.centerY;
-  const radius = stickState.radius;
-  const knobX = stickState.knobX;
-  const knobY = stickState.knobY;
-  
-  // БАГ #3: проверяем границы перед рисованием
-  const minX = 0;
-  const maxX = canvasWidth - 1;
-  const minY = 0;
-  const maxY = canvasHeight - 1;
-  
-  // База
-  for (let dy = -radius * 1.2; dy <= radius * 1.2; dy++) {
-    for (let dx = -radius * 1.2; dx <= radius * 1.2; dx++) {
-      if (Math.hypot(dx, dy) > radius * 1.2) continue;
-      const px = Math.floor(cx + dx);
-      const py = Math.floor(cy + dy);
-      if (px < minX || px > maxX || py < minY || py > maxY) continue;
-      const idx = (py * canvasWidth + px) * 4;
-      if (idx >= 0 && idx < renderer.data.length - 4) {
-        renderer.data[idx] = 20;
-        renderer.data[idx + 1] = 30;
-        renderer.data[idx + 2] = 40;
-        renderer.data[idx + 3] = 150;
-      }
-    }
-  }
-  
-  // Ручка
-  const knobRadius = Math.max(12, radius * 0.3);
-  for (let dy = -knobRadius; dy <= knobRadius; dy++) {
-    for (let dx = -knobRadius; dx <= knobRadius; dx++) {
-      if (Math.hypot(dx, dy) > knobRadius) continue;
-      const px = Math.floor(knobX + dx);
-      const py = Math.floor(knobY + dy);
-      if (px < minX || px > maxX || py < minY || py > maxY) continue;
-      const idx = (py * canvasWidth + px) * 4;
-      if (idx >= 0 && idx < renderer.data.length - 4) {
-        renderer.data[idx] = 80;
-        renderer.data[idx + 1] = 200;
-        renderer.data[idx + 2] = 255;
-        renderer.data[idx + 3] = 220;
-      }
-    }
-  }
-}
-
-// ============================================================
-//  15. ОБНОВЛЕНИЕ
-// ============================================================
-
-function update(dt) {
-  const moveSpeed = player.moveSpeed * settings.sensitivity.move;
-  const turnSpeed = player.turnSpeed * settings.sensitivity.look;
-  
-  const forward = movement.forward * moveSpeed * dt;
-  const strafe = movement.strafe * moveSpeed * dt * 0.8;
-  
-  if (forward !== 0 || strafe !== 0) {
-    const angle = player.angle;
-    const dx = Math.cos(angle) * forward - Math.sin(angle) * strafe;
-    const dy = Math.sin(angle) * forward + Math.cos(angle) * strafe;
-    player.move(dx, dy, map);
-  }
-  
-  // БАГ #12: поворот от джойстика (если добавим)
-  if (movement.turn !== 0) {
-    player.angle += movement.turn * turnSpeed * dt;
-  }
-  
-  for (let i = bullets.length - 1; i >= 0; i--) {
-    bullets[i].update(dt, map);
-    if (!bullets[i].alive) {
-      const sp = bullets[i].screenPos(player, canvasWidth, canvasHeight);
-      if (sp) {
-        hitEffects.push({
-          x: sp.x,
-          y: sp.y,
-          size: Math.min(canvasWidth, canvasHeight) * 0.02,
-          life: 0.2,
-          maxLife: 0.2,
-          type: 'hit'
-        });
-      }
-      bullets.splice(i, 1);
-    }
-  }
-  
-  frameCount++;
-}
-
-// ============================================================
-//  16. ГЛАВНЫЙ ЦИКЛ
-// ============================================================
-
-function gameLoop(timestamp) {
-  if (!lastFrameTime) lastFrameTime = timestamp;
-  const dt = Math.min(0.05, (timestamp - lastFrameTime) / 1000);
-  lastFrameTime = timestamp;
-  
-  if (!isPaused) {
-    update(dt);
-    renderScene();
-  }
-  
-  if (debugActive && frameCount % 60 === 0) {
-    updateDebugInfo();
-  }
-  
-  requestAnimationFrame(gameLoop);
-}
-
-// ============================================================
-//  17. НАСТРОЙКИ UI
-// ============================================================
-
-function setupSettingsUI() {
-  const overlay = document.getElementById('settingsOverlay');
-  const settingsBtn = document.getElementById('settingsBtn');
-  const closeBtn = document.getElementById('settingsClose');
-  const applyBtn = document.getElementById('settingsApply');
-  const resetBtn = document.getElementById('resetDefaults');
-  
-  const joyScale = document.getElementById('joyScale');
-  const joySize = document.getElementById('joySize');
-  const fireSize = document.getElementById('fireSize');
-  const sensMove = document.getElementById('sensMove');
-  const sensLook = document.getElementById('sensLook');
-  const gfxRadios = document.getElementsByName('gfxPreset');
-  
-  function openSettings() {
-    isPaused = true;
-    overlay.style.display = 'flex';
-    
-    joyScale.value = settings.joystick.scale;
-    joySize.value = settings.joystick.hitArea;
-    fireSize.value = settings.fire.size;
-    sensMove.value = settings.sensitivity.move;
-    sensLook.value = settings.sensitivity.look;
-    
-    for (const r of gfxRadios) {
-      r.checked = r.value === settings.graphics.preset;
-    }
-    
-    updatePreviewStick();
-    updatePreviewFire();
-  }
-  
-  function closeSettings(apply = false) {
-    overlay.style.display = 'none';
-    if (apply) {
-      saveSettings();
-      resetStick();
-      updateFireButton();
-      resizeCanvas();
-    }
-    isPaused = false;
-  }
-  
-  settingsBtn.addEventListener('click', openSettings);
-  closeBtn.addEventListener('click', () => closeSettings(false));
-  
-  applyBtn.addEventListener('click', () => {
-    settings.joystick.scale = parseFloat(joyScale.value);
-    settings.joystick.hitArea = parseFloat(joySize.value);
-    settings.fire.size = parseInt(fireSize.value, 10);
-    settings.sensitivity.move = parseFloat(sensMove.value);
-    settings.sensitivity.look = parseFloat(sensLook.value);
-    
-    const sel = Array.from(gfxRadios).find(r => r.checked);
-    if (sel) settings.graphics.preset = sel.value;
-    
-    closeSettings(true);
-  });
-  
-  resetBtn.addEventListener('click', () => {
-    settings = structuredClone(defaultSettings);
-    joyScale.value = settings.joystick.scale;
-    joySize.value = settings.joystick.hitArea;
-    fireSize.value = settings.fire.size;
-    sensMove.value = settings.sensitivity.move;
-    sensLook.value = settings.sensitivity.look;
-    updatePreviewStick();
-    updatePreviewFire();
-  });
-  
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeSettings(false);
-  });
-  
-  // Превью джойстика
-  const previewStick = document.getElementById('previewStick');
-  const previewPad = document.getElementById('previewPad');
-  
-  let isDraggingStick = false;
-  previewStick.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    isDraggingStick = true;
-    previewStick.setPointerCapture(e.pointerId);
-  });
-  
-  window.addEventListener('pointermove', (e) => {
-    if (!isDraggingStick || e.pointerType === 'mouse') return;
-    const rect = previewPad.getBoundingClientRect();
-    let lx = e.clientX - rect.left;
-    let ly = e.clientY - rect.top;
-    lx = Math.max(10, Math.min(rect.width - 10, lx));
-    ly = Math.max(10, Math.min(rect.height - 10, ly));
-    previewStick.style.left = (lx - previewStick.offsetWidth / 2) + 'px';
-    previewStick.style.top = (ly - previewStick.offsetHeight / 2) + 'px';
-    
-    settings.joystick.x_pct = Math.max(0.02, Math.min(0.98, lx / rect.width));
-    settings.joystick.y_pct = Math.max(0.02, Math.min(0.98, ly / rect.height));
-  });
-  
-  window.addEventListener('pointerup', (e) => {
-    if (isDraggingStick) {
-      isDraggingStick = false;
-      try { previewStick.releasePointerCapture(e.pointerId); } catch {}
-    }
-  });
-  
-  // Превью кнопки огня
-  const previewFire = document.getElementById('previewFire');
-  const previewPadFire = document.getElementById('previewPadFire');
-  
-  let isDraggingFire = false;
-  previewFire.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    isDraggingFire = true;
-    previewFire.setPointerCapture(e.pointerId);
-  });
-  
-  window.addEventListener('pointermove', (e) => {
-    if (!isDraggingFire || e.pointerType === 'mouse') return;
-    const rect = previewPadFire.getBoundingClientRect();
-    let lx = e.clientX - rect.left;
-    let ly = e.clientY - rect.top;
-    lx = Math.max(10, Math.min(rect.width - 10, lx));
-    ly = Math.max(10, Math.min(rect.height - 10, ly));
-    previewFire.style.left = (lx - previewFire.offsetWidth / 2) + 'px';
-    previewFire.style.top = (ly - previewFire.offsetHeight / 2) + 'px';
-    
-    settings.fire.x_pct = Math.max(0.02, Math.min(0.98, lx / rect.width));
-    settings.fire.y_pct = Math.max(0.02, Math.min(0.98, ly / rect.height));
-  });
-  
-  window.addEventListener('pointerup', (e) => {
-    if (isDraggingFire) {
-      isDraggingFire = false;
-      try { previewFire.releasePointerCapture(e.pointerId); } catch {}
-    }
-  });
-  
-  joyScale.addEventListener('input', (e) => {
-    previewStick.style.transform = `scale(${e.target.value})`;
-  });
-  
-  fireSize.addEventListener('input', (e) => {
-    const size = Math.max(30, Math.min(120, e.target.value * 0.6));
-    previewFire.style.width = size + 'px';
-    previewFire.style.height = size + 'px';
-  });
-  
-  function updatePreviewStick() {
-    const rect = previewPad.getBoundingClientRect();
-    const px = Math.max(10, Math.min(rect.width - 10, settings.joystick.x_pct * rect.width));
-    const py = Math.max(10, Math.min(rect.height - 10, settings.joystick.y_pct * rect.height));
-    previewStick.style.left = (px - previewStick.offsetWidth / 2) + 'px';
-    previewStick.style.top = (py - previewStick.offsetHeight / 2) + 'px';
-    previewStick.style.transform = `scale(${settings.joystick.scale})`;
-  }
-  
-  function updatePreviewFire() {
-    const rect = previewPadFire.getBoundingClientRect();
-    const px = Math.max(10, Math.min(rect.width - 10, settings.fire.x_pct * rect.width));
-    const py = Math.max(10, Math.min(rect.height - 10, settings.fire.y_pct * rect.height));
-    const size = Math.max(30, Math.min(120, settings.fire.size * 0.6));
-    previewFire.style.width = size + 'px';
-    previewFire.style.height = size + 'px';
-    previewFire.style.left = (px - size / 2) + 'px';
-    previewFire.style.top = (py - size / 2) + 'px';
-  }
-}
-
-// ============================================================
-//  18. КНОПКА ОГНЯ
-// ============================================================
-
-function updateFireButton() {
-  const btn = document.getElementById('fireBtn');
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const size = Math.max(40, Math.min(140, settings.fire.size));
-  const px = Math.round(Math.max(0.04, Math.min(0.96, settings.fire.x_pct)) * w);
-  const py = Math.round(Math.max(0.04, Math.min(0.96, settings.fire.y_pct)) * h);
-  
-  btn.style.width = size + 'px';
-  btn.style.height = size + 'px';
-  btn.style.left = (px - size / 2) + 'px';
-  btn.style.top = (py - size / 2) + 'px';
-  btn.style.fontSize = Math.max(20, size * 0.45) + 'px';
-}
-
-// ============================================================
-//  19. РАЗМЕР CANVAS (ИСПРАВЛЕН БАГ #7 - ОБРАБОТКА ОРИЕНТАЦИИ)
-// ============================================================
-
-function resizeCanvas() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  
-  DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-  const qualityFactor = settings.graphics.preset === 'ultra' ? 1.2 :
-                        settings.graphics.preset === 'quality' ? 1.0 : 0.7;
-  
-  canvasWidth = Math.max(300, Math.floor(w * DPR * qualityFactor));
-  canvasHeight = Math.max(200, Math.floor(h * DPR * qualityFactor));
-  
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  
+function resizeCanvas(){
+  W=window.innerWidth; H=window.innerHeight;
+  DPR=Math.min(2,Math.max(1,window.devicePixelRatio||1));
+  const qf=settings.graphics.preset==='quality'?1:0.6;
+  canvas.width=Math.max(300,Math.floor(W*DPR*qf));
+  canvas.height=Math.max(200,Math.floor(H*DPR*qf));
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
   renderer.init();
 }
 
-// ============================================================
-//  20. ЗАКРЫТИЕ ОТЛАДКИ
-// ============================================================
+const renderer={
+  data:null,
+  init(){this.data=ctx.createImageData(canvas.width,canvas.height);},
+  clear(){for(let i=0;i<this.data.data.length;i++)this.data.data[i]=0;},
+  setPixel(x,y,r,g,b){const idx=(y*canvas.width+x)*4;if(idx>=0&&idx<this.data.data.length-4){this.data.data[idx]=r;this.data.data[idx+1]=g;this.data.data[idx+2]=b;this.data.data[idx+3]=255;}},
+  drawColumn(x,yTop,yBottom,shade,side,wallX){
+    const b=Math.max(0.15,Math.min(1,shade));
+    const base=side===0?[180,160,120]:[140,120,90];
+    const tex=Math.sin(wallX*30)*0.06+0.94;
+    const r=Math.floor(base[0]*b*tex),g=Math.floor(base[1]*b*tex),bl=Math.floor(base[2]*b*tex);
+    const ys=Math.max(0,Math.floor(yTop)),ye=Math.min(canvas.height-1,Math.floor(yBottom));
+    for(let y=ys;y<=ye;y++){const idx=(y*canvas.width+x)*4;if(idx>=0&&idx<this.data.data.length-4){this.data.data[idx]=r;this.data.data[idx+1]=g;this.data.data[idx+2]=bl;this.data.data[idx+3]=255;}}
+  },
+  drawFloorCeiling(){
+    const half=canvas.height/2;
+    for(let y=0;y<canvas.height;y++){
+      const isC=y<half,t=isC?y/half:(y-half)/half,b=isC?0.25+t*0.45:0.1+t*0.25;
+      const r=Math.floor(70*b),g=Math.floor(90*b),bl=Math.floor(120*b);
+      for(let x=0;x<canvas.width;x++){const idx=(y*canvas.width+x)*4;if(idx>=0&&idx<this.data.data.length-4){this.data.data[idx]=r;this.data.data[idx+1]=g;this.data.data[idx+2]=bl;this.data.data[idx+3]=255;}}
+    }
+  },
+  render(){ctx.putImageData(this.data,0,0);}
+};
 
-document.getElementById('debugClose').addEventListener('click', () => {
-  debugActive = false;
-  document.getElementById('debugOverlay').classList.remove('active');
-});
-
-// ============================================================
-//  21. ИНИЦИАЛИЗАЦИЯ (БАГ #11 - ИНДИКАТОР ЗАГРУЗКИ)
-// ============================================================
-
-function init() {
-  // Показываем индикатор загрузки
-  const loading = document.getElementById('loadingIndicator');
-  
-  // Инициализация
-  resizeCanvas();
-  resetStick();
-  updateFireButton();
-  setupInput();
-  setupSettingsUI();
-  setupDebugTap();
-  
-  // БАГ #7: обработка изменения ориентации
-  let orientationTimeout = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(orientationTimeout);
-    orientationTimeout = setTimeout(() => {
-      resizeCanvas();
-      resetStick();
-      updateFireButton();
-    }, 200);
-  });
-  
-  // Скрываем индикатор загрузки
-  setTimeout(() => {
-    loading.classList.add('hidden');
-    setTimeout(() => {
-      loading.style.display = 'none';
-    }, 500);
-  }, 300);
-  
-  requestAnimationFrame(gameLoop);
-  
-  console.log('🔥 Shuterok Engine v5 (исправленная) загружена!');
-  console.log(`📐 Размер: ${canvasWidth}x${canvasHeight}`);
-  console.log(`🗺️ Карта: ${map.size}x${map.size}`);
-  console.log('👆 Тройной тап для отладки');
-  console.log('✅ Исправлены все 13 багов!');
+// ============================================
+// 3. КАРТА (20x20)
+// ============================================
+class Map{
+  constructor(size=20){this.size=size;this.grid=[];this.generate();}
+  generate(){
+    const s=this.size;this.grid=Array(s*s).fill(1);
+    const rooms=[[2,2,5,5],[13,2,5,5],[2,13,5,5],[13,13,5,5],[7,7,6,6]];
+    rooms.forEach(r=>{for(let i=r[0];i<r[0]+r[2];i++)for(let j=r[1];j<r[1]+r[3];j++)if(i<s&&j<s)this.grid[j*s+i]=0;});
+    const corr=[[[4,4],[4,7]],[[4,7],[7,7]],[[16,4],[16,7]],[[16,7],[13,7]],[[4,16],[4,13]],[[4,13],[7,13]],[[16,16],[16,13]],[[16,13],[13,13]],[[7,10],[10,10]],[[10,10],[10,7]],[[7,10],[7,13]],[[10,10],[13,10]]];
+    corr.forEach(([f,t])=>{let [x,y]=f;while(x!==t[0]||y!==t[1]){if(x<t[0])x++;else if(x>t[0])x--;else if(y<t[1])y++;else if(y>t[1])y--;if(x>=0&&x<s&&y>=0&&y<s)this.grid[y*s+x]=0;}});
+    [[9,5],[10,5],[9,14],[10,14]].forEach(([x,y])=>{if(x<s&&y<s)this.grid[y*s+x]=1;});
+  }
+  at(x,y){const xi=Math.floor(x),yi=Math.floor(y);if(xi<0||xi>=this.size||yi<0||yi>=this.size)return 1;return this.grid[yi*this.size+xi];}
+  isWall(x,y){return this.at(x,y)===1;}
 }
 
-init();
+// ============================================
+// 4. ИГРОК
+// ============================================
+class Player{
+  constructor(x,y){this.x=x;this.y=y;this.ang=0;this.fov=Math.PI/2.8;this.speed=3.0;this.turnSpeed=2.5;this.radius=0.25;}
+  get dir(){return {x:Math.cos(this.ang),y:Math.sin(this.ang)};}
+  move(dx,dy,map){
+    const nx=this.x+dx,ny=this.y+dy;
+    if(!map.isWall(nx+this.radius,this.y)&&!map.isWall(nx-this.radius,this.y))this.x=nx;
+    if(!map.isWall(this.x,ny+this.radius)&&!map.isWall(this.x,ny-this.radius))this.y=ny;
+  }
+}
+
+// ============================================
+// 5. РЕЙКАСТИНГ (DDA)
+// ============================================
+function castRay(px,py,angle,map){
+  const dx=Math.cos(angle),dy=Math.sin(angle);
+  let x=px,y=py;
+  const sx=dx>0?1:-1,sy=dy>0?1:-1;
+  let tx=dx>0?(Math.floor(x)+1-x)/dx:(x-Math.floor(x))/-dx;
+  let ty=dy>0?(Math.floor(y)+1-y)/dy:(y-Math.floor(y))/-dy;
+  const tdX=1/Math.abs(dx),tdY=1/Math.abs(dy);
+  let hit=false,side=0,wallX=0,dist=0,it=0;
+  while(!hit&&it<30){it++;if(tx<ty){x+=sx*0.001;tx+=tdX;side=0;}else{y+=sy*0.001;ty+=tdY;side=1;}if(map.isWall(x,y)){hit=true;dist=Math.hypot(x-px,y-py);wallX=side===0?y-Math.floor(y):x-Math.floor(x);}}
+  if(!hit){dist=20;wallX=0.5;}
+  return {distance:dist,side,wallX};
+}
+
+// ============================================
+// 6. ПУЛИ
+// ============================================
+class Bullet{
+  constructor(x,y,ang,speed=10){this.x=x;this.y=y;this.dirX=Math.cos(ang);this.dirY=Math.sin(ang);this.speed=speed;this.life=2.5;this.alive=true;this.px=x;this.py=y;}
+  update(dt,map){
+    if(!this.alive)return;
+    this.px=this.x;this.py=this.y;
+    this.x+=this.dirX*this.speed*dt;this.y+=this.dirY*this.speed*dt;this.life-=dt;
+    if(this.life<=0){this.alive=false;return;}
+    const steps=Math.max(3,Math.ceil(this.speed*dt/0.02));
+    for(let i=0;i<=steps;i++){const t=i/steps;if(map.isWall(this.px+(this.x-this.px)*t,this.py+(this.y-this.py)*t)){this.alive=false;return;}}
+  }
+  screenPos(player,cw,ch){
+    const dx=this.x-player.x,dy=this.y-player.y,dist=Math.hypot(dx,dy);
+    if(dist<0.01)return null;
+    let ang=Math.atan2(dy,dx)-player.ang;
+    while(ang>Math.PI)ang-=Math.PI*2;while(ang<-Math.PI)ang+=Math.PI*2;
+    if(Math.abs(ang)>player.fov/2+0.2)return null;
+    return {x:(ang/player.fov+0.5)*cw,y:ch/2-(1-Math.min(1,dist/15))*ch*0.2};
+  }
+}
+
+// ============================================
+// 7. СОСТОЯНИЕ
+// ============================================
+const map=new Map(20);
+const player=new Player(10,10);
+const bullets=[],hitEffects=[];
+let move={f:0,s:0,t:0},lastShot=0,paused=false,lastFrame=0,frame=0,startTime=performance.now();
+
+// ============================================
+// 8. ДЖОЙСТИК (ПРОСТОЙ И РАБОЧИЙ)
+// ============================================
+let stick={id:null,cx:0,cy:0,r:60,kx:0,ky:0,pressed:false};
+let look={id:null,lx:0};
+
+function getCenter(){return {x:Math.round(Math.max(0.04,Math.min(0.96,settings.joystick.x_pct))*W),y:Math.round(Math.max(0.04,Math.min(0.96,settings.joystick.y_pct))*H)};}
+function resetStick(){const c=getCenter();stick.cx=c.x;stick.cy=c.y;stick.r=Math.max(40,Math.min(W,H)*settings.joystick.hitArea*settings.joystick.scale);stick.kx=stick.cx;stick.ky=stick.cy;move.f=0;move.s=0;}
+function updateStick(x,y){
+  const dx=x-stick.cx,dy=y-stick.cy,d=Math.hypot(dx,dy),max=stick.r,dz=max*0.05;
+  if(d<dz){stick.kx=stick.cx;stick.ky=stick.cy;move.f=0;move.s=0;return;}
+  let kx=x,ky=y,nd=d;if(d>max){kx=stick.cx+dx*(max/d);ky=stick.cy+dy*(max/d);nd=max;}
+  stick.kx=kx;stick.ky=ky;
+  const f=(nd-dz)/(max-dz),a=Math.atan2(dy,dx);
+  move.f=Math.cos(a)*f;move.s=Math.sin(a)*f;
+}
+
+// ============================================
+// 9. ВВОД (РАБОЧАЯ ВЕРСИЯ)
+// ============================================
+function setupInput(){
+  canvas.addEventListener('pointerdown',onDown);
+  canvas.addEventListener('pointermove',onMove);
+  canvas.addEventListener('pointerup',onUp);
+  canvas.addEventListener('pointercancel',onUp);
+  document.getElementById('fireBtn').addEventListener('pointerdown',onFireDown);
+  document.getElementById('fireBtn').addEventListener('pointerup',onFireUp);
+}
+
+function onDown(e){
+  if(paused)return;
+  const x=e.clientX,y=e.clientY;
+  const fb=document.getElementById('fireBtn').getBoundingClientRect();
+  if(x>=fb.left&&x<=fb.right&&y>=fb.top&&y<=fb.bottom)return;
+  const c=getCenter();
+  if((x<W*0.5||Math.hypot(x-c.x,y-c.y)<stick.r*1.5)&&stick.id===null){
+    stick.id=e.pointerId;stick.pressed=true;const cc=getCenter();stick.cx=cc.x;stick.cy=cc.y;updateStick(x,y);
+    try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+    return;
+  }
+  if(look.id===null){look.id=e.pointerId;look.lx=x;try{canvas.setPointerCapture(e.pointerId);}catch(_){}}
+}
+
+function onMove(e){
+  if(paused)return;
+  const x=e.clientX,y=e.clientY;
+  if(e.pointerId===stick.id&&stick.pressed){updateStick(x,y);return;}
+  if(e.pointerId===look.id){const dx=x-look.lx;look.lx=x;player.ang+=dx*(Math.PI*0.8/W)*settings.sensitivity.look;}
+}
+
+function onUp(e){
+  if(e.pointerId===stick.id){stick.id=null;stick.pressed=false;move.f=0;move.s=0;stick.kx=stick.cx;stick.ky=stick.cy;try{canvas.releasePointerCapture(e.pointerId);}catch(_){}}
+  if(e.pointerId===look.id){look.id=null;try{canvas.releasePointerCapture(e.pointerId);}catch(_){}}
+}
+
+function onFireDown(e){try{e.target.setPointerCapture(e.pointerId);}catch(_){}shoot();}
+function onFireUp(e){try{e.target.releasePointerCapture(e.pointerId);}catch(_){}}
+
+function shoot(){
+  if(performance.now()-lastShot<120)return;lastShot=performance.now();
+  const d=player.dir;bullets.push(new Bullet(player.x+d.x*0.35,player.y+d.y*0.35,player.ang,9+Math.random()*2));
+  hitEffects.push({x:canvas.width/2,y:canvas.height/2,size:Math.min(canvas.width,canvas.height)*0.04,life:0.08,maxLife:0.08});
+}
+
+// ============================================
+// 10. ТРОЙНОЙ ТАП
+// ============================================
+let taps=[],debug=false;
+document.addEventListener('pointerdown',(e)=>{
+  if(e.pointerType==='mouse')return;
+  const now=performance.now();taps.push(now);taps=taps.filter(t=>now-t<1000);
+  if(taps.length>=3){taps=[];debug=!debug;document.getElementById('debugOverlay').classList.toggle('active',debug);if(debug)updateDebug();}
+});
+document.getElementById('debugClose').addEventListener('click',()=>{debug=false;document.getElementById('debugOverlay').classList.remove('active');});
+
+function updateDebug(){
+  const el=document.getElementById('debugContent');
+  const fps=lastFrame>0?Math.round(1000/(performance.now()-lastFrame)):0;
+  const info={
+    'Canvas':`${canvas.width}×${canvas.height}`,
+    'Игрок':`(${player.x.toFixed(2)},${player.y.toFixed(2)}) угол:${(player.ang*180/Math.PI).toFixed(1)}°`,
+    'Карта':`${map.size}×${map.size}`,
+    'Пули':bullets.length,
+    'FPS':fps||'...',
+    'Стик':stick.pressed?'АКТИВЕН':'неактивен',
+    'Обзор':look.id!==null?'АКТИВЕН':'неактивен',
+    'Движение':`F:${move.f.toFixed(2)} S:${move.s.toFixed(2)}`
+  };
+  let html='';for(const[k,v]of Object.entries(info))html+=`<span class="label">${k}</span> → <span class="value">${v}</span>\n`;
+  el.textContent=html;
+}
+
+// ============================================
+// 11. РЕНДЕРИНГ ИГРЫ
+// ============================================
+function render(){
+  renderer.clear();renderer.drawFloorCeiling();
+  const cols=settings.graphics.preset==='quality'?Math.floor(canvas.width*0.7):Math.floor(canvas.width*0.5);
+  const step=player.fov/cols;let ang=player.ang-player.fov/2;
+  for(let i=0;i<cols;i++){const r=castRay(player.x,player.y,ang,map);const cd=r.distance*Math.cos(ang-player.ang);const h=Math.min(canvas.height*2,canvas.height/(cd+0.01));const yt=(canvas.height-h)/2,yb=(canvas.height+h)/2;const sh=Math.max(0.1,Math.min(1,1.4-cd*0.07));const x=Math.floor((i/cols)*canvas.width);renderer.drawColumn(x,yt,yb,sh,r.side,r.wallX);ang+=step;}
+  for(const b of bullets){const sp=b.screenPos(player,canvas.width,canvas.height);if(sp){const s=Math.max(3,6*(1-Math.min(1,Math.hypot(b.x-player.x,b.y-player.y)/15)));for(let dy=-s;dy<=s;dy++)for(let dx=-s;dx<=s;dx++){if(Math.hypot(dx,dy)>s)continue;const idx=((Math.floor(sp.y)+dy)*canvas.width+Math.floor(sp.x)+dx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=255;renderer.data.data[idx+1]=220;renderer.data.data[idx+2]=100;renderer.data.data[idx+3]=255;}}}}
+  for(let i=hitEffects.length-1;i>=0;i--){const e=hitEffects[i];e.life-=1/60;if(e.life<=0){hitEffects.splice(i,1);continue;}const a=e.life/e.maxLife,s=e.size*(1+(1-a)*0.5);for(let dy=-s;dy<=s;dy++)for(let dx=-s;dx<=s;dx++){if(Math.hypot(dx,dy)>s)continue;const idx=((Math.floor(e.y)+dy)*canvas.width+Math.floor(e.x)+dx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=Math.floor(255*a);renderer.data.data[idx+1]=Math.floor(200*a);renderer.data.data[idx+2]=Math.floor(100*a);renderer.data.data[idx+3]=255;}}}
+  drawMinimap();drawCrosshair();drawStick();renderer.render();
+}
+
+// ============================================
+// 12. МИНИ-КАРТА
+// ============================================
+function drawMinimap(){
+  const s=Math.min(120,canvas.width*0.14),p=8,x=canvas.width-s-p,y=p,c=(s-4)/map.size;
+  for(let j=0;j<s;j++)for(let i=0;i<s;i++){const idx=((Math.floor(y)+j)*canvas.width+Math.floor(x)+i)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=8;renderer.data.data[idx+1]=10;renderer.data.data[idx+2]=14;renderer.data.data[idx+3]=220;}}
+  for(let my=0;my<map.size;my++)for(let mx=0;mx<map.size;mx++)if(map.isWall(mx+0.5,my+0.5)){const px=Math.floor(x+2+mx*c),py=Math.floor(y+2+my*c);for(let j=0;j<Math.ceil(c);j++)for(let i=0;i<Math.ceil(c);i++){const idx=((py+j)*canvas.width+px+i)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=120;renderer.data.data[idx+1]=120;renderer.data.data[idx+2]=120;renderer.data.data[idx+3]=180;}}}
+  const px=Math.floor(x+2+player.x*c),py=Math.floor(y+2+player.y*c),pr=Math.max(2,c*0.4);
+  for(let j=-pr;j<=pr;j++)for(let i=-pr;i<=pr;i++){if(Math.hypot(i,j)>pr)continue;const idx=((py+j)*canvas.width+px+i)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=255;renderer.data.data[idx+1]=230;renderer.data.data[idx+2]=50;renderer.data.data[idx+3]=255;}}
+  const dl=c*1.2,ex=px+Math.cos(player.ang)*dl,ey=py+Math.sin(player.ang)*dl;
+  for(let t=0;t<1;t+=0.02){const lx=Math.floor(px+(ex-px)*t),ly=Math.floor(py+(ey-py)*t);const idx=(ly*canvas.width+lx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=255;renderer.data.data[idx+1]=200;renderer.data.data[idx+2]=80;renderer.data.data[idx+3]=255;}}
+}
+
+// ============================================
+// 13. ПРИЦЕЛ
+// ============================================
+function drawCrosshair(){
+  const cx=canvas.width/2,cy=canvas.height/2,s=Math.max(10,canvas.width*0.025),g=Math.max(4,s*0.3);
+  const draw=(x1,y1,x2,y2)=>{const st=Math.max(1,Math.hypot(x2-x1,y2-y1));for(let t=0;t<=1;t+=1/st){const lx=Math.floor(x1+(x2-x1)*t),ly=Math.floor(y1+(y2-y1)*t);const idx=(ly*canvas.width+lx)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=200;renderer.data.data[idx+1]=240;renderer.data.data[idx+2]=255;renderer.data.data[idx+3]=220;}}};
+  [[-s,0,-g,0],[g,0,s,0],[0,-s,0,-g],[0,g,0,s]].forEach(([x1,y1,x2,y2])=>{draw(cx+x1,cy+y1,cx+x2,cy+y2);});
+}
+
+// ============================================
+// 14. ДЖОЙСТИК (ОВЕРЛЕЙ)
+// ============================================
+function drawStick(){
+  if(!stick.pressed)return;
+  const cx=stick.cx,cy=stick.cy,r=stick.r,kx=stick.kx,ky=stick.ky;
+  for(let dy=-r*1.2;dy<=r*1.2;dy++)for(let dx=-r*1.2;dx<=r*1.2;dx++){if(Math.hypot(dx,dy)>r*1.2)continue;const px=Math.floor(cx+dx),py=Math.floor(cy+dy);if(px<0||px>=canvas.width||py<0||py>=canvas.height)continue;const idx=(py*canvas.width+px)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=20;renderer.data.data[idx+1]=30;renderer.data.data[idx+2]=40;renderer.data.data[idx+3]=150;}}
+  const kr=Math.max(12,r*0.3);
+  for(let dy=-kr;dy<=kr;dy++)for(let dx=-kr;dx<=kr;dx++){if(Math.hypot(dx,dy)>kr)continue;const px=Math.floor(kx+dx),py=Math.floor(ky+dy);if(px<0||px>=canvas.width||py<0||py>=canvas.height)continue;const idx=(py*canvas.width+px)*4;if(idx>=0&&idx<renderer.data.data.length-4){renderer.data.data[idx]=80;renderer.data.data[idx+1]=200;renderer.data.data[idx+2]=255;renderer.data.data[idx+3]=220;}}
+}
+
+// ============================================
+// 15. ОБНОВЛЕНИЕ И ЦИКЛ
+// ============================================
+function update(dt){
+  const ms=player.speed*settings.sensitivity.move,ts=player.turnSpeed*settings.sensitivity.look;
+  const f=move.f*ms*dt,s=move.s*ms*dt*0.8;
+  if(f!==0||s!==0){const a=player.ang;player.move(Math.cos(a)*f-Math.sin(a)*s,Math.sin(a)*f+Math.cos(a)*s,map);}
+  if(move.t!==0)player.ang+=move.t*ts*dt;
+  for(let i=bullets.length-1;i>=0;i--){bullets[i].update(dt,map);if(!bullets[i].alive){const sp=bullets[i].screenPos(player,canvas.width,canvas.height);if(sp)hitEffects.push({x:sp.x,y:sp.y,size:Math.min(canvas.width,canvas.height)*0.02,life:0.2,maxLife:0.2});bullets.splice(i,1);}}
+  frame++;
+}
+
+function loop(t){
+  if(!lastFrame)lastFrame=t;const dt=Math.min(0.05,(t-lastFrame)/1000);lastFrame=t;
+  if(!paused){update(dt);render();if(debug&&frame%60===0)updateDebug();}
+  requestAnimationFrame(loop);
+}
+
+// ============================================
+// 16. НАСТРОЙКИ UI
+// ============================================
+function setupUI(){
+  const ov=document.getElementById('settingsOverlay'),btn=document.getElementById('settingsBtn');
+  const close=document.getElementById('settingsClose'),apply=document.getElementById('settingsApply'),reset=document.getElementById('resetDefaults');
+  const js=document.getElementById('joyScale'),ji=document.getElementById('joySize'),fs=document.getElementById('fireSize');
+  const sm=document.getElementById('sensMove'),sl=document.getElementById('sensLook'),gr=document.getElementsByName('gfxPreset');
+  const ps=document.getElementById('previewStick'),pf=document.getElementById('previewFire'),pp=document.getElementById('previewPad'),ppf=document.getElementById('previewPadFire');
+  
+  function open(){paused=true;ov.style.display='flex';js.value=settings.joystick.scale;ji.value=settings.joystick.hitArea;fs.value=settings.fire.size;sm.value=settings.sensitivity.move;sl.value=settings.sensitivity.look;for(const r of gr)r.checked=r.value===settings.graphics.preset;updatePreview();}
+  function closeS(apply=false){ov.style.display='none';if(apply){saveSettings();resetStick();updateFireBtn();resizeCanvas();}paused=false;}
+  
+  btn.addEventListener('click',open);
+  close.addEventListener('click',()=>closeS(false));
+  apply.addEventListener('click',()=>{settings.joystick.scale=parseFloat(js.value);settings.joystick.hitArea=parseFloat(ji.value);settings.fire.size=parseInt(fs.value);settings.sensitivity.move=parseFloat(sm.value);settings.sensitivity.look=parseFloat(sl.value);const sel=Array.from(gr).find(r=>r.checked);if(sel)settings.graphics.preset=sel.value;closeS(true);});
+  reset.addEventListener('click',()=>{settings=structuredClone(defaultSettings);js.value=settings.joystick.scale;ji.value=settings.joystick.hitArea;fs.value=settings.fire.size;sm.value=settings.sensitivity.move;sl.value=settings.sensitivity.look;updatePreview();});
+  ov.addEventListener('click',(e)=>{if(e.target===ov)closeS(false);});
+  
+  let drag=false;ps.addEventListener('pointerdown',(e)=>{if(e.pointerType==='mouse')return;drag=true;ps.setPointerCapture(e.pointerId);});
+  window.addEventListener('pointermove',(e)=>{if(!drag||e.pointerType==='mouse')return;const r=pp.getBoundingClientRect();let lx=e.clientX-r.left,ly=e.clientY-r.top;lx=Math.max(10,Math.min(r.width-10,lx));ly=Math.max(10,Math.min(r.height-10,ly));ps.style.left=(lx-ps.offsetWidth/2)+'px';ps.style.top=(ly-ps.offsetHeight/2)+'px';settings.joystick.x_pct=Math.max(0.02,Math.min(0.98,lx/r.width));settings.joystick.y_pct=Math.max(0.02,Math.min(0.98,ly/r.height));});
+  window.addEventListener('pointerup',(e)=>{if(drag){drag=false;try{ps.releasePointerCapture(e.pointerId);}catch(_){}}});
+  
+  let dragF=false;pf.addEventListener('pointerdown',(e)=>{if(e.pointerType==='mouse')return;dragF=true;pf.setPointerCapture(e.pointerId);});
+  window.addEventListener('pointermove',(e)=>{if(!dragF||e.pointerType==='mouse')return;const r=ppf.getBoundingClientRect();let lx=e.clientX-r.left,ly=e.clientY-r.top;lx=Math.max(10,Math.min(r.width-10,lx));ly=Math.max(10,Math.min(r.height-10,ly));pf.style.left=(lx-pf.offsetWidth/2)+'px';pf.style.top=(ly-pf.offsetHeight/2)+'px';settings.fire.x_pct=Math.max(0.02,Math.min(0.98,lx/r.width));settings.fire.y_pct=Math.max(0.02,Math.min(0.98,ly/r.height));});
+  window.addEventListener('pointerup',(e)=>{if(dragF){dragF=false;try{pf.releasePointerCapture(e.pointerId);}catch(_){}}});
+  
+  js.addEventListener('input',()=>{ps.style.transform=`scale(${js.value})`;});
+  fs.addEventListener('input',()=>{const s=Math.max(30,Math.min(120,fs.value*0.6));pf.style.width=s+'px';pf.style.height=s+'px';});
+  
+  function updatePreview(){
+    const r=pp.getBoundingClientRect();const px=Math.max(10,Math.min(r.width-10,settings.joystick.x_pct*r.width));const py=Math.max(10,Math.min(r.height-10,settings.joystick.y_pct*r.height));ps.style.left=(px-ps.offsetWidth/2)+'px';ps.style.top=(py-ps.offsetHeight/2)+'px';ps.style.transform=`scale(${settings.joystick.scale})`;
+    const rf=ppf.getBoundingClientRect();const pxf=Math.max(10,Math.min(rf.width-10,settings.fire.x_pct*rf.width));const pyf=Math.max(10,Math.min(rf.height-10,settings.fire.y_pct*rf.height));const sf=Math.max(30,Math.min(120,settings.fire.size*0.6));pf.style.width=sf+'px';pf.style.height=sf+'px';pf.style.left=(pxf-sf/2)+'px';pf.style.top=(pyf-sf/2)+'px';
+  }
+}
+
+function updateFireBtn(){
+  const btn=document.getElementById('fireBtn'),s=Math.max(40,Math.min(140,settings.fire.size));
+  btn.style.width=s+'px';btn.style.height=s+'px';
+  btn.style.left=(Math.round(Math.max(0.04,Math.min(0.96,settings.fire.x_pct))*W)-s/2)+'px';
+  btn.style.top=(Math.round(Math.max(0.04,Math.min(0.96,settings.fire.y_pct))*H)-s/2)+'px';
+  btn.style.fontSize=Math.max(20,s*0.45)+'px';
+}
+
+// ============================================
+// 17. ЗАПУСК
+// ============================================
+resizeCanvas();resetStick();updateFireBtn();setupInput();setupUI();
+window.addEventListener('resize',()=>{W=window.innerWidth;H=window.innerHeight;resizeCanvas();resetStick();updateFireBtn();});
+requestAnimationFrame(loop);
+console.log('🔥 Shuterok FIXED загружен! Тройной тап для отладки.');
 </script>
 </body>
 </html>
