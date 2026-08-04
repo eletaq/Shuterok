@@ -1,265 +1,902 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ru">
 <head>
-    <title>Skeleton Shooter</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; color: #fff; }
-        canvas { display: block; background: #000; }
-        #debug-log {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00ff00;
-            font-family: monospace;
-            font-size: 10px;
-            overflow: auto;
-            white-space: pre-wrap;
-            z-index: 1000;
-            display: none; /* Скрыто по умолчанию, показать по двойному тапу */
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Mobile pseudo-3D dungeon prototype — fixed camera & minimap, lights, ceiling</title>
+<style>
+  :root{ --hud-bg: rgba(0,0,0,0.4); --accent: #ffcc33; --text: #ffffff; }
+  html,body{ height:100%; margin:0; background:#111; -webkit-touch-callout:none; -webkit-user-select:none; }
+  #game-wrap{ position:relative; width:100vw; height:100vh; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  canvas#game { background: #222; display:block; touch-action:none; }
+  .hud{ position:absolute; left:0; right:0; pointer-events:none; top:0; bottom:0; }
+  .top-bar{ display:flex; justify-content:space-between; padding:8px; pointer-events:auto; }
+  .stat{ background:var(--hud-bg); color:var(--text); padding:6px 10px; border-radius:8px; font-family:system-ui, sans-serif; font-size:14px; }
+  .controls { position:absolute; bottom:8px; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; padding:12px; }
+  .left-pad, .right-pad { pointer-events:auto; }
+  .joystick { width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; touch-action:none; }
+  .joystick .thumb { width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,0.18); transform:translate(0,0); transition:0.02s linear; }
+  .action-btn { width:72px; height:72px; border-radius:50%; background:rgba(0,0,0,0.4); color:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; pointer-events:auto; }
+  .hint { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.35); color:#ddd; padding:6px 10px; border-radius:8px; font-size:12px; pointer-events:none; }
+  @media (orientation:landscape) {
+    .joystick { width:100px; height:100px; } .joystick .thumb { width:36px; height:36px; }
+    .action-btn { width:60px; height:60px; font-size:16px; }
+  }
+</style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="debug-log"></div>
+<div id="game-wrap">
+  <canvas id="game"></canvas>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const debugLog = document.getElementById('debug-log');
-        let logBuffer = [];
+  <div class="hud">
+    <div class="top-bar">
+      <div class="stat" id="hp">HP: 100</div>
+      <div class="stat" id="lvl">LVL: 1</div>
+    </div>
 
-        function appendLog(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            const fullMessage = `${timestamp}: ${message}`;
-            console.log(fullMessage);
-            logBuffer.push(fullMessage);
-            if (logBuffer.length > 50) { // Ограничиваем буфер, чтобы не перегружать память
-                logBuffer.shift();
-            }
-            debugLog.textContent = logBuffer.join('\n');
-            debugLog.scrollTop = debugLog.scrollHeight; // Прокручиваем вниз
+    <div class="controls">
+      <div class="left-pad">
+        <div id="joystick" class="joystick" aria-hidden="true">
+          <div id="thumb" class="thumb"></div>
+        </div>
+      </div>
+
+      <div class="right-pad">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div id="fireBtn" class="action-btn">FIRE</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint">Левый джойстик — движение. Тяните правую сторону экрана для поворота.</div>
+  </div>
+</div>
+
+<script>
+/* ----------------
+   Конфигурация и утилиты
+   ---------------- */
+const config = {
+  mapSize: 36,
+  tileSize: 64,
+  screenRayResolution: 2,
+  fov: Math.PI/3,
+  maxRenderDistance: 20,
+  roomsAttempts: 30,
+  minRoomSize: 3,
+  maxRoomSize: 8,
+  targetRoomCount: 9,
+  enemyPerFloor: 8,
+  canvasBaseRes: {w: 360, h: 220}, // Base resolution for calculation, scaled by actual canvas size
+
+  // weapon / projectile params
+  projectileSpeed: 14.0,    // tiles / sec
+  projectileMaxLifetime: 1.6, // sec
+  projectilePoolSize: 48,
+  fireCooldown: 0.16,       // sec between shots (auto when holding)
+  projectileDamage: 6,
+  recoilAngle: 0.012,       // base recoil applied to player angle per shot
+  pathfindCooldown: 0.6,    // enemies update A* path no more frequently than this
+  enemyKnockback: 0.35,     // tiles pushed on hit
+
+  // Rendering
+  wallColors: [ // Different shades/textures for walls
+    { r: 140, g: 110, b: 90 }, // default
+    { r: 120, g: 100, b: 80 },
+    { r: 150, g: 120, b: 100 },
+  ],
+  lightBrightness: 0.8, // Max brightness added by a light source
+  lightRadius: 5,       // Radius in tiles around light source
+  ambientLight: 0.15,   // Min ambient light level
+};
+
+/* полезные функции */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rnd(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function randf(min,max){ return min + Math.random()*(max-min); }
+function dist(a,b){ let dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function angleNorm(a){ while(a < -Math.PI) a += Math.PI*2; while(a > Math.PI) a -= Math.PI*2; return a; }
+
+/* ----------------
+   Dungeon generator
+   ---------------- */
+class Dungeon {
+  constructor(size) {
+    this.size = size;
+    this.grid = Array.from({length:size}, ()=>Array(size).fill(1));
+    this.rooms = [];
+  }
+  carveRoom(x,y,w,h){
+    for(let i=x;i<x+w;i++) for(let j=y;j<y+h;j++){
+      if(i>0 && j>0 && i<this.size-1 && j<this.size-1) this.grid[j][i] = 0;
+    }
+    this.rooms.push({x, y, w, h, cx: x+Math.floor(w/2), cy: y+Math.floor(h/2)});
+  }
+  carveHorizontal(x1,x2,y){ for(let x=Math.min(x1,x2); x<=Math.max(x1,x2); x++) if(x>0&&x<this.size-1&&y>0&&y<this.size-1) this.grid[y][x]=0; }
+  carveVertical(y1,y2,x){ for(let y=Math.min(y1,y2); y<=Math.max(y1,y2); y++) if(x>0&&x<this.size-1&&y>0&&y<this.size-1) this.grid[y][x]=0; }
+  generate() {
+    let attempts = config.roomsAttempts;
+    while(attempts-- && this.rooms.length < config.targetRoomCount) {
+      const w = rnd(config.minRoomSize, config.maxRoomSize);
+      const h = rnd(config.minRoomSize, config.maxRoomSize);
+      const x = rnd(1, this.size - w - 2);
+      const y = rnd(1, this.size - h - 2);
+      let ok = true;
+      for(let rx = x-1; rx <= x+w; rx++){
+        for(let ry = y-1; ry <= y+h; ry++){
+          if(rx<0||ry<0||rx>=this.size||ry>=this.size) continue;
+          if(this.grid[ry][rx] === 0) { ok = false; break; }
         }
+        if(!ok) break;
+      }
+      if(ok) this.carveRoom(x,y,w,h);
+    }
+    if(this.rooms.length){
+      let centers = this.rooms.map(r=>({x:r.cx,y:r.cy}));
+      centers.sort((a,b)=>a.x-b.x);
+      for(let i=1;i<centers.length;i++){
+        const a = centers[i-1], b = centers[i];
+        if(Math.random() < 0.5){ this.carveHorizontal(a.x, b.x, a.y); this.carveVertical(a.y, b.y, b.x); }
+        else { this.carveVertical(a.y, b.y, a.x); this.carveHorizontal(a.x, b.x, b.y); }
+      }
+    }
+    for(let i=0;i<this.size;i++){ this.grid[0][i]=1; this.grid[this.size-1][i]=1; this.grid[i][0]=1; this.grid[i][this.size-1]=1; }
+  }
+  getRandomFloorInRoom(roomIdx){
+    const r = this.rooms[roomIdx];
+    const x = rnd(r.x, r.x + r.w - 1);
+    const y = rnd(r.y, r.y + r.h - 1);
+    return { x, y };
+  }
+  isWall(tx,ty){ if(tx<0||ty<0||tx>=this.size||ty>=this.size) return true; return this.grid[ty][tx]===1; }
+  findRoomIndexAt(tx,ty){
+    for(let i=0;i<this.rooms.length;i++){
+      const r=this.rooms[i];
+      if(tx>=r.x && tx<r.x+r.w && ty>=r.y && ty<r.y+r.h) return i;
+    }
+    return -1;
+  }
+}
 
-        appendLog("Game script started.");
-        appendLog(`User Agent: ${navigator.userAgent}`);
-        appendLog(`Window dimensions: ${window.innerWidth}x${window.innerHeight}`);
-        appendLog(`Device pixel ratio: ${window.devicePixelRatio}`);
+/* ----------------
+   Entities
+   ---------------- */
+class Player {
+  constructor(x,y,angle=0){
+    this.x = x + 0.5; this.y = y + 0.5; this.angle = angle;
+    this.speed = 2.4; this.hp = 100; this.level = 1; this.exp = 0;
+    this.recoilOffset = 0; // for visual recoil
+  }
+}
 
-        let gameRunning = false; // Флаг для управления циклом игры
-        let player = { x: 0, y: 0, width: 50, height: 50, speed: 5, color: 'blue' };
-        let bullets = [];
-        let enemies = [];
-        let score = 0;
-        let lastTouch = { x: 0, y: 0 };
-        let touchActive = false;
-        let animationFrameId = null;
+class Enemy {
+  constructor(x,y){
+    this.x = x + 0.5; this.y = y + 0.5;
+    this.hp = 12; this.speed = 1.2; this.state = 'idle'; this.dead = false;
+    this._path = null;
+    this._pathIndex = 0;
+    this._pathTimer = 0;
+    this._flinchTimer = 0;
+    this._atkCooldown = 0;
+  }
+}
 
-        // Инициализация Canvas
-        function initCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            player.x = canvas.width / 2 - player.width / 2;
-            player.y = canvas.height - player.height * 2;
-            appendLog(`Canvas initialized: ${canvas.width}x${canvas.height}`);
-            if (!gameRunning) {
-                gameRunning = true;
-                gameLoop(); // Запускаем игровой цикл только после инициализации
-            }
+/* ----------------
+   Projectile system + pool + hit sprites
+   ---------------- */
+class Projectile {
+  constructor(){
+    this.alive = false;
+    this.x = 0; this.y = 0; this.px = 0; this.py = 0;
+    this.vx = 0; this.vy = 0;
+    this.life = 0;
+  }
+  spawn(x,y,vx,vy){
+    this.alive = true; this.x = x; this.y = y; this.px = x; this.py = y; this.vx = vx; this.vy = vy; this.life = 0;
+  }
+  kill(){ this.alive = false; }
+}
+
+class HitSprite {
+  constructor(x,y){
+    this.x = x; this.y = y; this.life = 0.45; // duration of hit sprite
+  }
+}
+
+/* ----------------
+   Simple A* pathfinding on grid (4-neighbors)
+   Returns array of {x,y} tiles or null
+   ---------------- */
+function findPathAStar(map, startTile, goalTile) {
+  const size = map.size;
+  const inBounds = (x,y)=> x>=0&&y>=0&&x<size&&y<size;
+  const key = (x,y)=>`${x},${y}`;
+  const neighbors = [[1,0],[-1,0],[0,1],[0,-1]];
+
+  const open = new Map(); // key -> node
+  const closed = new Set();
+  const startKey = key(startTile.x, startTile.y);
+  open.set(startKey, {x:startTile.x,y:startTile.y,g:0,h:Math.abs(goalTile.x-startTile.x)+Math.abs(goalTile.y-startTile.y),f:0,prev:null});
+  open.get(startKey).f = open.get(startKey).g + open.get(startKey).h;
+
+  while(open.size){
+    // pick node with smallest f
+    let currentK=null, currentN=null;
+    for(const [k,n] of open){ if(!currentN || n.f < currentN.f) { currentK = k; currentN = n; } }
+    open.delete(currentK);
+    const ck = key(currentN.x,currentN.y);
+    closed.add(ck);
+    if(currentN.x === goalTile.x && currentN.y === goalTile.y){
+      // reconstruct
+      const path = [];
+      let cur = currentN;
+      while(cur){ path.push({x:cur.x,y:cur.y}); cur = cur.prev; }
+      path.reverse();
+      return path;
+    }
+    for(const nb of neighbors){
+      const nx = currentN.x + nb[0], ny = currentN.y + nb[1];
+      const nk = key(nx,ny);
+      if(!inBounds(nx,ny)) continue;
+      if(map.isWall(nx,ny)) continue;
+      if(closed.has(nk)) continue;
+      const gscore = currentN.g + 1;
+      const hscore = Math.abs(goalTile.x - nx) + Math.abs(goalTile.y - ny);
+      const fscore = gscore + hscore;
+      const existing = open.get(nk);
+      if(!existing || gscore < existing.g){
+        open.set(nk, {x:nx,y:ny,g:gscore,h:hscore,f:fscore, prev: currentN});
+      }
+    }
+  }
+  return null;
+}
+
+/* ----------------
+   Renderer (modified to draw projectiles + hits + ceiling + lights)
+   ---------------- */
+class Renderer {
+  constructor(canvas){
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    this.resize();
+  }
+  resize(){
+    const rect = this.canvas.getBoundingClientRect();
+    const availW = Math.floor(rect.width);
+    const availH = Math.floor(rect.height);
+
+    // Calculate effective render resolution based on current canvas size
+    // We want to maintain aspect ratio based on config.canvasBaseRes
+    const aspect = config.canvasBaseRes.w / config.canvasBaseRes.h;
+    let targetW = availW;
+    let targetH = availW / aspect;
+
+    if (targetH > availH) {
+      targetH = availH;
+      targetW = availH * aspect;
+    }
+
+    this.renderW = targetW;
+    this.renderH = targetH;
+
+    this.canvas.width = Math.floor(this.renderW * this.dpr);
+    this.canvas.height = Math.floor(this.renderH * this.dpr);
+    this.canvas.style.width = availW + 'px'; // Stretch to fill available space
+    this.canvas.style.height = availH + 'px';
+    this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
+  }
+  clear(){ this.ctx.fillStyle = '#444'; this.ctx.fillRect(0,0,this.renderW,this.renderH); }
+
+  // Calculates light contribution at a given world point
+  getLightContribution(wx, wy, lights) {
+    let totalBrightness = config.ambientLight;
+    for (const light of lights) {
+      const d = Math.hypot(wx - light.x, wy - light.y);
+      if (d < config.lightRadius) {
+        const falloff = 1 - (d / config.lightRadius);
+        totalBrightness += config.lightBrightness * falloff;
+      }
+    }
+    return clamp(totalBrightness, 0, 1);
+  }
+
+  drawSkyAndFloor(player, map, lights){
+    const ctx = this.ctx;
+    const h = this.renderH; const mid = Math.floor(h/2);
+
+    // Sky
+    const sky = ctx.createLinearGradient(0,0,0,mid);
+    sky.addColorStop(0, '#2b2b50'); sky.addColorStop(1, '#1e1e30');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,this.renderW,mid);
+
+    // Floor and Ceiling - simplified approach: draw a gradient for both
+    const floorGradient = ctx.createLinearGradient(0, mid, 0, h);
+    floorGradient.addColorStop(0, '#333'); // Darker at horizon
+    floorGradient.addColorStop(1, '#555'); // Lighter closer to player
+    ctx.fillStyle = floorGradient;
+    ctx.fillRect(0, mid, this.renderW, h);
+
+    const ceilingGradient = ctx.createLinearGradient(0, 0, 0, mid);
+    ceilingGradient.addColorStop(0, '#222'); // Darker at top
+    ceilingGradient.addColorStop(1, '#444'); // Lighter at horizon
+    ctx.fillStyle = ceilingGradient;
+    ctx.fillRect(0, 0, this.renderW, mid);
+  }
+
+  // map world position to screen X using player's angle & fov
+  worldXToScreenX(player, wx, wy){
+    const screenW = this.renderW; const fov = config.fov;
+    const dx = wx - player.x, dy = wy - player.y;
+    const angleTo = Math.atan2(dy, dx);
+    let delta = angleTo - player.angle;
+    while(delta < -Math.PI) delta += Math.PI*2;
+    while(delta > Math.PI) delta -= Math.PI*2;
+    if(Math.abs(delta) > fov/2 + 0.5) return null;
+    const screenX = Math.tan(delta) * (screenW/2) / Math.tan(fov/2) + (screenW/2);
+    return {screenX, angleTo, distance: Math.hypot(dx,dy)};
+  }
+
+  renderFrame(state){
+    const ctx = this.ctx;
+    this.clear();
+    const player = state.player; const map = state.map; const enemies = state.enemies;
+    const lights = state.lights;
+    const screenW = this.renderW; const screenH = this.renderH; const halfH = screenH/2;
+    const fov = config.fov; const rayStep = config.screenRayResolution; const numRays = Math.floor(screenW/rayStep);
+    const angleStart = player.angle - fov/2;
+
+    this.drawSkyAndFloor(player, map, lights); // Draw floor and ceiling first
+
+    // Walls (raycast)
+    const hits = [];
+    for(let r=0, sx=0; r<numRays; r++, sx += rayStep){
+      const rayAngle = angleStart + (r/numRays) * fov;
+      let sin = Math.sin(rayAngle), cos = Math.cos(rayAngle);
+      let distance = 0; let hit=false, hitX=0, hitY=0;
+      let wallType = 0; // Default wall type
+      let wallTextureOffset = 0;
+
+      while(!hit && distance < config.maxRenderDistance){
+        distance += 0.05; // Step distance
+        const rx = player.x + cos*distance;
+        const ry = player.y + sin*distance;
+        if(map.isWall(Math.floor(rx), Math.floor(ry))){
+          hit = true; hitX = rx; hitY = ry;
+          // Determine wall type based on cell coordinates (e.g., checkerboard pattern)
+          wallType = (Math.floor(rx) + Math.floor(ry)) % config.wallColors.length;
+          // Calculate texture offset for rudimentary texture mapping
+          const hit_cell_x = Math.floor(rx);
+          const hit_cell_y = Math.floor(ry);
+          const frac_x = rx - hit_cell_x;
+          const frac_y = ry - hit_cell_y;
+
+          if (Math.abs(frac_x - 0.5) > Math.abs(frac_y - 0.5)) { // Vertical wall hit
+              wallTextureOffset = (rx > hit_cell_x + 0.5) ? frac_y : (1 - frac_y);
+          } else { // Horizontal wall hit
+              wallTextureOffset = (ry > hit_cell_y + 0.5) ? frac_x : (1 - frac_x);
+          }
+          break;
         }
+      }
+      if(!hit) continue;
 
-        window.addEventListener('resize', initCanvas);
+      const corrected = distance * Math.cos(rayAngle - player.angle - player.recoilOffset); // Apply recoil to camera angle
+      const wallHeight = clamp((config.tileSize * (screenH/2)) / (corrected * config.tileSize), 0, screenH*2);
+      const x = sx; const lineW = rayStep;
 
-        // Инициализация игры
-        function initGame() {
-            enemies = []; // Очищаем врагов при инициализации
-            score = 0;
-            appendLog("Game initialized.");
-            initCanvas(); // Инициализация canvas должна быть первой
+      // Lighting calculation for wall segment
+      const lightContrib = this.getLightContribution(hitX, hitY, lights);
+      const shadeFromDistance = clamp(1 - corrected/(config.maxRenderDistance*0.9), 0.0, 1.0);
+      const finalShade = clamp(shadeFromDistance + lightContrib, config.ambientLight, 1.0); // Combine distance shade and light source
+
+      const baseColor = config.wallColors[wallType];
+      const r_final = Math.floor(baseColor.r * finalShade);
+      const g_final = Math.floor(baseColor.g * finalShade);
+      const b_final = Math.floor(baseColor.b * finalShade);
+      const color = `rgba(${r_final},${g_final},${b_final},1)`;
+
+      ctx.fillStyle = color;
+      ctx.fillRect(x, halfH - wallHeight/2, lineW+1, wallHeight);
+
+      // Add simple horizontal lines for wall texture detail
+      ctx.strokeStyle = `rgba(0,0,0,0.15)`; // Darker lines for texture
+      ctx.beginPath();
+      for(let i = 0; i < wallHeight; i += 8){ // Every 8 pixels
+        ctx.moveTo(x, halfH - wallHeight/2 + i);
+        ctx.lineTo(x + lineW + 1, halfH - wallHeight/2 + i);
+      }
+      ctx.stroke();
+
+      hits.push({dist: corrected, sx: x, w: lineW});
+    }
+
+    // enemies sprites
+    const visibleSprites = [];
+    for(const e of enemies){
+      if(e.dead) continue;
+      const dx = e.x - player.x, dy = e.y - player.y;
+      const angleTo = Math.atan2(dy,dx);
+      let delta = angleTo - player.angle; while(delta < -Math.PI) delta += Math.PI*2; while(delta > Math.PI) delta -= Math.PI*2;
+      if(Math.abs(delta) > fov/2 + 0.2) continue;
+      const distance = Math.hypot(dx,dy);
+      // occlusion approx
+      let blocked = false; let steps = Math.floor(distance*10);
+      for(let s=1;s<steps;s++){
+        const t = s/steps;
+        const px = player.x + dx*t; const py = player.y + dy*t;
+        if(map.isWall(Math.floor(px), Math.floor(py))){ blocked = true; break; }
+      }
+      if(blocked) continue;
+      visibleSprites.push({enemy: e, dist: distance, angle: angleTo});
+    }
+    visibleSprites.sort((a,b)=>b.dist-a.dist);
+    for(const s of visibleSprites){
+      const e = s.enemy;
+      const dx = e.x - player.x, dy = e.y - player.y;
+      const angleTo = Math.atan2(dy,dx);
+      let delta = angleTo - player.angle - player.recoilOffset; while(delta < -Math.PI) delta += Math.PI*2; while(delta > Math.PI) delta -= Math.PI*2;
+      const screenX = Math.tan(delta) * (screenW/2) / Math.tan(fov/2) + (screenW/2);
+      const sizeOnScreen = clamp( (config.tileSize* (screenH/2)) / (s.dist*config.tileSize), 6, screenH*0.9 );
+      const sy = halfH - sizeOnScreen/2;
+      ctx.beginPath(); ctx.fillStyle = 'rgba(200,80,80,1)';
+      const dxs = sizeOnScreen*0.5, dys = sizeOnScreen*0.5;
+      ctx.ellipse(screenX, halfH, dxs, dys, 0, 0, Math.PI*2); ctx.fill();
+      // health bar
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(screenX - sizeOnScreen/2, sy - 6, sizeOnScreen, 4);
+      ctx.fillStyle = 'rgba(0,220,0,0.9)'; const hpFrac = clamp(e.hp/12, 0, 1);
+      ctx.fillRect(screenX - sizeOnScreen/2, sy - 6, sizeOnScreen * hpFrac, 4);
+    }
+
+    // projectiles: draw tracers & small projectile sprite
+    if(state.projectiles){
+      ctx.save();
+      ctx.lineWidth = 1.5;
+      for(const p of state.projectiles){
+        if(!p.alive) continue;
+        const prev = this.worldXToScreenX(player, p.px, p.py);
+        const curr = this.worldXToScreenX(player, p.x, p.y);
+        if(prev && curr){
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.globalAlpha = clamp(1 - ( (p.life*1.5) / config.projectileMaxLifetime), 0.12, 1);
+          ctx.beginPath();
+          ctx.moveTo(prev.screenX, halfH - 6);
+          ctx.lineTo(curr.screenX, halfH - 6);
+          ctx.stroke();
+          // small bright dot for bullet
+          const size = clamp(6 / (curr.distance*0.18 + 0.4), 2.5, 10);
+          ctx.fillStyle = 'rgba(255,255,255,1)';
+          ctx.beginPath(); ctx.arc(curr.screenX, halfH - 2, size*0.5, 0, Math.PI*2); ctx.fill();
+          ctx.globalAlpha = 1;
         }
+      }
+      ctx.restore();
+    }
 
-        // Рисование объектов
-        function drawPlayer() {
-            ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-        }
+    // hit sprites (wall hits)
+    if(state.hits){
+      ctx.save();
+      for(const h of state.hits){
+        const wpos = this.worldXToScreenX(player, h.x, h.y);
+        if(!wpos) continue;
+        const alpha = clamp(h.life / 0.45, 0, 1);
+        ctx.fillStyle = `rgba(255,200,120,${alpha})`;
+        ctx.beginPath(); ctx.arc(wpos.screenX, halfH - 14, 6 * alpha, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
 
-        function drawBullets() {
-            bullets.forEach(bullet => {
-                ctx.fillStyle = 'yellow';
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-            });
-        }
+    // small mini-map
+    const minDim = Math.min(this.renderW, this.renderH);
+    const mapSizePx = Math.min(120, Math.floor(minDim * 0.22)); // Max 120px, but scales with smallest screen dimension
+    const ms = mapSizePx; const cell = ms / map.size;
+    const mapOffsetX = 8; // Small padding
+    const mapOffsetY = 8;
 
-        function drawEnemies() {
-            enemies.forEach(enemy => {
-                ctx.fillStyle = enemy.color;
-                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-            });
-        }
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(mapOffsetX, mapOffsetY, ms + 4, ms + 4);
+    for(let y=0;y<map.size;y++){ for(let x=0;x<map.size;x++){
+      ctx.fillStyle = map.grid[y][x] ? '#222' : '#666';
+      ctx.fillRect(mapOffsetX + 2 + x*cell, mapOffsetY + 2 + y*cell, cell, cell);
+    }}
+    ctx.fillStyle = '#00ffcc'; ctx.fillRect(mapOffsetX + 2 + (player.x-0.5)*cell - 2, mapOffsetY + 2 + (player.y-0.5)*cell - 2, 4, 4);
+    ctx.fillStyle = '#ff6666'; for(const e of enemies){ if(e.dead) continue; ctx.fillRect(mapOffsetX + 2 + (e.x-0.5)*cell - 2, mapOffsetY + 2 + (e.y-0.5)*cell - 2, 4, 4); }
+    ctx.globalAlpha = 1;
+  }
+}
 
-        function drawScore() {
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText('Score: ' + score, 10, 30);
-        }
+/* ----------------
+   Game loop, input, projectile logic, enemy AI
+   ---------------- */
+class Game {
+  constructor(canvas){
+    this.canvas = canvas;
+    this.renderer = new Renderer(canvas);
+    this.state = {};
+    this.lastTime = 0;
+    this.setup();
+    this.bindEvents();
+    this.running = true;
+    requestAnimationFrame(this.loop.bind(this));
+  }
 
-        // Обновление состояния игры
-        function update() {
-            if (!gameRunning) return; // Останавливаем обновление, если игра не запущена
+  setup(){
+    this.dungeon = new Dungeon(config.mapSize); this.dungeon.generate();
+    const startRoom = this.dungeon.rooms[0] || {cx:3,cy:3};
+    this.player = new Player(startRoom.cx, startRoom.cy, randf(0,Math.PI*2));
+    const enemies = []; const availableRooms = this.dungeon.rooms.map((r,i)=>i).filter(i=>i!==0);
+    for(let i=0;i<config.enemyPerFloor;i++){
+      const ridx = availableRooms.length ? availableRooms[ rnd(0, availableRooms.length-1) ] : (this.dungeon.rooms.length>1?1:0);
+      const p = this.dungeon.getRandomFloorInRoom(ridx);
+      enemies.push(new Enemy(p.x, p.y));
+    }
+    // projectile pool
+    this.projectiles = Array.from({length:config.projectilePoolSize}, ()=>new Projectile());
+    this.hits = [];
 
-            // Движение игрока (остаётся для сенсорного управления)
-            if (touchActive) {
-                const targetX = lastTouch.x - player.width / 2;
-                const dx = targetX - player.x;
-                if (Math.abs(dx) > player.speed) {
-                    player.x += Math.sign(dx) * player.speed;
-                } else {
-                    player.x = targetX;
-                }
-                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-            }
-
-            // Движение пуль
-            bullets.forEach((bullet, index) => {
-                bullet.y -= bullet.speed;
-                if (bullet.y < 0) {
-                    bullets.splice(index, 1);
-                }
-            });
-
-            // Движение врагов и их столкновения
-            enemies.forEach((enemy, enemyIndex) => {
-                enemy.y += enemy.speed;
-                if (enemy.y > canvas.height) {
-                    enemies.splice(enemyIndex, 1);
-                    // Проигрыш при пропуске врага, или просто продолжаем игру
-                    // appendLog("Enemy passed, game over or continue.");
-                }
-
-                bullets.forEach((bullet, bulletIndex) => {
-                    if (
-                        bullet.x < enemy.x + enemy.width &&
-                        bullet.x + bullet.width > enemy.x &&
-                        bullet.y < enemy.y + enemy.height &&
-                        bullet.y + bullet.height > enemy.y
-                    ) {
-                        // Столкновение пули и врага
-                        bullets.splice(bulletIndex, 1);
-                        enemies.splice(enemyIndex, 1);
-                        score += 10;
-                        appendLog(`Hit! Score: ${score}`);
-                    }
-                });
-
-                // Столкновение игрока и врага
-                if (
-                    player.x < enemy.x + enemy.width &&
-                    player.x + player.width > enemy.x &&
-                    player.y < enemy.y + enemy.height &&
-                    player.y + player.height > enemy.y
-                ) {
-                    appendLog("Player hit by enemy! Game Over!");
-                    gameRunning = false; // Останавливаем игру
-                    cancelAnimationFrame(animationFrameId); // Останавливаем цикл
-                    alert('Game Over! Score: ' + score + '\nRefresh to play again.');
-                    // Для дебага не перезагружаем сразу, чтобы видеть логи
-                }
-            });
-
-            // Спавн врагов
-            if (Math.random() < 0.02) { // Шанс спавна врага
-                enemies.push({
-                    x: Math.random() * (canvas.width - 40),
-                    y: -40,
-                    width: 40,
-                    height: 40,
-                    speed: Math.random() * 2 + 1,
-                    color: 'red'
-                });
-            }
-        }
-
-        // Основной игровой цикл
-        function gameLoop() {
-            if (!gameRunning) {
-                appendLog("Game loop stopped.");
-                return;
-            }
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Очистка
-            update(); // Обновление
-            drawPlayer(); // Отрисовка
-            drawBullets();
-            drawEnemies();
-            drawScore();
-
-            animationFrameId = requestAnimationFrame(gameLoop); // Следующий кадр
-        }
-
-        // Обработчики событий касания
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Предотвратить прокрутку/масштабирование
-            appendLog(`Touch started at ${e.touches[0].clientX}, ${e.touches[0].clientY}`);
-            touchActive = true;
-            lastTouch.x = e.touches[0].clientX;
-            lastTouch.y = e.touches[0].clientY;
-
-            // Выстрел
-            bullets.push({
-                x: player.x + player.width / 2 - 2.5,
-                y: player.y,
-                width: 5,
-                height: 10,
-                speed: 7
-            });
-            appendLog("Bullet fired.");
-        }, { passive: false });
-
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // Предотвратить прокрутку/масштабирование
-            if (touchActive) {
-                lastTouch.x = e.touches[0].clientX;
-                lastTouch.y = e.touches[0].clientY;
-                appendLog(`Touch moved to ${lastTouch.x}, ${lastTouch.y}`);
-            }
-        }, { passive: false });
-
-        canvas.addEventListener('touchend', (e) => {
-            appendLog("Touch ended.");
-            touchActive = false;
+    // Light sources (in the center of rooms)
+    this.lights = [];
+    for(let i=0; i<this.dungeon.rooms.length; i++){
+      const r = this.dungeon.rooms[i];
+      // Place a light source in some rooms, slightly randomized
+      if(Math.random() < 0.8){ // 80% of rooms get a light
+        this.lights.push({
+          x: r.cx + randf(-0.3, 0.3),
+          y: r.cy + randf(-0.3, 0.3),
         });
-
-        // Добавляем двойной тап для показа/скрытия логов
-        let lastTap = 0;
-        canvas.addEventListener('touchend', function(e) {
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 300 && tapLength > 0) {
-                debugLog.style.display = debugLog.style.display === 'none' ? 'block' : 'none';
-                appendLog(`Debug log visibility toggled to ${debugLog.style.display}`);
-            }
-            lastTap = currentTime;
-        });
+      }
+    }
 
 
-        // Запуск игры
-        appendLog("Calling initGame()...");
-        initGame();
-        appendLog("initGame() called.");
+    this.state = { map: this.dungeon, player: this.player, enemies, projectiles: this.projectiles, hits: this.hits, lights: this.lights };
 
-        // В случае, если gameLoop не стартует сразу
-        setTimeout(() => {
-            if (!gameRunning && animationFrameId === null) {
-                appendLog("Game loop did not start. Attempting restart...");
-                gameRunning = true;
-                gameLoop();
-            }
-        }, 1000); // Проверка через 1 секунду
+    this.input = { moveX:0, moveY:0, isShooting:false, lookDX:0 };
+    this.joystickEl = document.getElementById('joystick'); this.thumbEl = document.getElementById('thumb'); this.fireBtn = document.getElementById('fireBtn');
+    this.hpEl = document.getElementById('hp'); this.lvlEl = document.getElementById('lvl');
 
-    </script>
+    this.lastFire = 0;
+    this.setupInput();
+    this.renderer.resize();
+  }
+
+  setupInput(){
+    const joy = this.joystickEl;
+    const thumb = this.thumbEl;
+    let activeJoystickPointerId = null;
+    let joystickOrigin = null;
+
+    // Joystick movement
+    const onJoystickPointerDown = (evt) => {
+      if (activeJoystickPointerId !== null) return;
+      activeJoystickPointerId = evt.pointerId;
+      joystickOrigin = { x: evt.clientX, y: evt.clientY };
+      joy.setPointerCapture(evt.pointerId);
+      this.updateThumb(0,0);
+    };
+    const onJoystickPointerMove = (evt) => {
+      if (evt.pointerId !== activeJoystickPointerId) return;
+      const dx = evt.clientX - joystickOrigin.x;
+      const dy = evt.clientY - joystickOrigin.y;
+      const maxDist = joy.clientWidth / 2;
+      const dist = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+
+      let clampedDx, clampedDy;
+      if (dist > maxDist) {
+        clampedDx = Math.cos(angle) * maxDist;
+        clampedDy = Math.sin(angle) * maxDist;
+      } else {
+        clampedDx = dx;
+        clampedDy = dy;
+      }
+      this.input.moveY = -clampedDy / maxDist; // Forward/backward
+      this.input.moveX = clampedDx / maxDist;  // Strafe
+      this.updateThumb(clampedDx, clampedDy);
+    };
+    const onJoystickPointerUp = (evt) => {
+      if (evt.pointerId !== activeJoystickPointerId) return;
+      activeJoystickPointerId = null;
+      joystickOrigin = null;
+      this.input.moveX = 0;
+      this.input.moveY = 0;
+      this.updateThumb(0,0);
+      joy.releasePointerCapture(evt.pointerId);
+    };
+
+    joy.addEventListener('pointerdown', onJoystickPointerDown);
+    joy.addEventListener('pointermove', onJoystickPointerMove);
+    joy.addEventListener('pointerup', onJoystickPointerUp);
+    joy.addEventListener('pointercancel', onJoystickPointerUp); // For when pointer leaves doc or is cancelled
+
+    this.updateThumb = (x,y) => { thumb.style.transform = `translate(${x}px,${y}px)`; };
+
+    // Fire button: auto-fire while holding (cooldown controls rate)
+    this.fireBtn.addEventListener('pointerdown', (e)=>{
+      this.input.isShooting = true;
+      e.target.setPointerCapture(e.pointerId);
+    });
+    this.fireBtn.addEventListener('pointerup', (e)=>{
+      this.input.isShooting = false;
+      e.target.releasePointerCapture(e.pointerId);
+    });
+    this.fireBtn.addEventListener('pointercancel', (e)=>{
+      this.input.isShooting = false;
+      e.target.releasePointerCapture(e.pointerId);
+    });
+
+    // Right side look (camera rotation)
+    let activeLookPointerId = null;
+    let lastLookX = null;
+    const onLookPointerDown = (evt) => {
+      // Only process if it's not the joystick pointer and it's on the right half of the screen
+      if (evt.pointerId === activeJoystickPointerId || evt.clientX < window.innerWidth * 0.45) return;
+      activeLookPointerId = evt.pointerId;
+      lastLookX = evt.clientX;
+      this.canvas.setPointerCapture(evt.pointerId); // Capture pointer on canvas
+    };
+    const onLookPointerMove = (evt) => {
+      if (evt.pointerId !== activeLookPointerId) return;
+      const dx = evt.clientX - lastLookX;
+      lastLookX = evt.clientX;
+      const sens = 0.004 * (window.innerWidth / 360); // Adjust sensitivity based on screen width
+      this.input.lookDX = dx * sens; // Store raw delta for smoothing
+    };
+    const onLookPointerUp = (evt) => {
+      if (evt.pointerId !== activeLookPointerId) return;
+      activeLookPointerId = null;
+      lastLookX = null;
+      this.input.lookDX = 0; // Stop rotation
+      this.canvas.releasePointerCapture(evt.pointerId);
+    };
+
+    this.canvas.addEventListener('pointerdown', onLookPointerDown);
+    this.canvas.addEventListener('pointermove', onLookPointerMove);
+    this.canvas.addEventListener('pointerup', onLookPointerUp);
+    this.canvas.addEventListener('pointercancel', onLookPointerUp);
+  }
+
+  bindEvents(){
+    window.addEventListener('resize', ()=>{ this.renderer.resize(); fitCanvasToParent(); });
+  }
+
+  loop(ts){
+    const dt = this.lastTime? Math.min(0.06,(ts - this.lastTime)/1000) : 0.016;
+    this.lastTime = ts;
+    if(this.running) this.update(dt);
+    this.renderer.renderFrame(this.state);
+    requestAnimationFrame(this.loop.bind(this));
+  }
+
+  // spawn projectile from pool
+  spawnProjectile(x,y, vx, vy){
+    for(const p of this.projectiles){
+      if(!p.alive){ p.spawn(x,y,vx,vy); return p; }
+    }
+    // if none free, reuse oldest
+    const p = this.projectiles[0]; p.spawn(x,y,vx,vy); return p;
+  }
+
+  tryShoot(dt){
+    if(!this.input.isShooting) {
+      // Decay recoil when not shooting
+      this.player.recoilOffset = lerp(this.player.recoilOffset, 0, dt * 8);
+      return;
+    }
+    this.lastFire -= dt;
+    if(this.lastFire > 0) return;
+    // fire
+    this.lastFire = config.fireCooldown;
+    const p = this.player;
+    // muzzle position slightly forward
+    const cos = Math.cos(p.angle), sin = Math.sin(p.angle);
+    const muzzleX = p.x + cos * 0.36;
+    const muzzleY = p.y + sin * 0.36;
+    // apply small spread + recoil
+    const spread = randf(-0.006, 0.006); // tiny spread
+    const angle = p.angle + spread + randf(-0.004, 0.004);
+    // visual recoil changes player angle slightly upwards temporarily
+    p.recoilOffset = lerp(p.recoilOffset, randf(-config.recoilAngle*0.8, config.recoilAngle*1.2), 0.5); // Smoother instant recoil
+    // Actual player angle for projectile is not affected by visual recoil offset
+    const speed = config.projectileSpeed;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    this.spawnProjectile(muzzleX, muzzleY, vx, vy);
+  }
+
+  updateProjectiles(dt){
+    for(const pr of this.projectiles){
+      if(!pr.alive) continue;
+      pr.px = pr.x; pr.py = pr.y;
+      const nx = pr.x + pr.vx * dt;
+      const ny = pr.y + pr.vy * dt;
+      // sample along segment from (pr.x,pr.y) to (nx,ny) for collisions
+      const steps = Math.max(1, Math.ceil(Math.hypot(nx-pr.x, ny-pr.y) / 0.06)); // Ensure small steps for accurate collision
+      let collided = false;
+      for(let s=1;s<=steps;s++){
+        const t = s/steps;
+        const sx = pr.x + (nx-pr.x)*t;
+        const sy = pr.y + (ny-pr.y)*t;
+        // check enemy hit first
+        for(const e of this.state.enemies){
+          if(e.dead) continue;
+          const ddx = sx - e.x, ddy = sy - e.y;
+          const dd = Math.hypot(ddx, ddy);
+          if(dd < 0.45){ // Hit radius for enemy
+            // hit enemy
+            e.hp -= config.projectileDamage;
+            e._flinchTimer = 0.18; // Brief flinch pause
+            // knockback away from player
+            const kx = (e.x - this.player.x);
+            const ky = (e.y - this.player.y);
+            const ln = Math.hypot(kx,ky) || 1;
+            e.x += (kx/ln) * config.enemyKnockback;
+            e.y += (ky/ln) * config.enemyKnockback;
+            // trigger alert/chase
+            e.state = 'chase';
+            e._pathTimer = 0; // Force path update
+            if(e.hp <= 0){ e.dead = true; this.player.exp += 6; }
+            pr.kill(); collided = true; break;
+          }
+        }
+        if(collided) break;
+        // check wall collision
+        if(this.state.map.isWall(Math.floor(sx), Math.floor(sy))){
+          // spawn hit sprite
+          this.hits.push(new HitSprite(sx, sy));
+          pr.kill(); collided = true; break;
+        }
+      }
+      if(!collided){
+        pr.x = nx; pr.y = ny;
+        pr.life += dt;
+        if(pr.life > config.projectileMaxLifetime) pr.kill();
+      }
+    }
+    // clean expired hit sprites
+    for(let i=this.hits.length-1;i>=0;i--){
+      this.hits[i].life -= dt; // Decay over time
+      if(this.hits[i].life <= 0) this.hits.splice(i,1);
+    }
+  }
+
+  // update enemy AI incl. A* chase limited frequency
+  updateEnemies(dt){
+    const map = this.state.map;
+    for(const e of this.state.enemies){
+      if(e.dead) continue;
+      // flinch handling
+      if(e._flinchTimer && e._flinchTimer > 0){
+        e._flinchTimer -= dt;
+        // slight pause while flinching
+        continue;
+      }
+      // determine rooms
+      const playerRoom = map.findRoomIndexAt(Math.floor(this.player.x), Math.floor(this.player.y));
+      const enemyRoom  = map.findRoomIndexAt(Math.floor(e.x), Math.floor(e.y));
+      const dxp = this.player.x - e.x, dyp = this.player.y - e.y;
+      const distToPlayer = Math.hypot(dxp, dyp);
+
+      if(e.state === 'idle'){
+        // wander behavior (existing)
+        if(!e._wanderTimer || e._wanderTimer <= 0){
+          e._wanderTimer = rnd(20, 60)/10;
+          e._tx = e.x + randf(-1.2,1.2);
+          e._ty = e.y + randf(-1.2,1.2);
+        }
+        e._wanderTimer -= dt;
+        const dirx = clamp(e._tx - e.x, -1, 1);
+        const diry = clamp(e._ty - e.y, -1, 1);
+        const edx = dirx * e.speed * dt;
+        const edy = diry * e.speed * dt;
+        this.tryMove(e, edx, edy);
+        // if player is in same room and close, become alert
+        if(enemyRoom !== -1 && enemyRoom === playerRoom && distToPlayer < 8){
+          e.state = 'alert';
+          e._pathTimer = 0;
+        }
+      } else { // 'alert' or 'chase' state
+        e._pathTimer -= dt;
+        // Recalculate path if no path or timer expired
+        if(!e._path || e._pathTimer <= 0){
+          const startTile = {x: Math.floor(e.x), y: Math.floor(e.y)};
+          const goalTile = {x: Math.floor(this.player.x), y: Math.floor(this.player.y)};
+          const path = findPathAStar(this.state.map, startTile, goalTile);
+          if(path && path.length > 1){
+            e._path = path; e._pathIndex = 1; e._pathTimer = config.pathfindCooldown;
+            e.state = 'chase'; // Confirm chase state
+          } else {
+            // Path not found or blocked, just retry later
+            e._path = null; e._pathTimer = config.pathfindCooldown;
+          }
+        }
+
+        // Follow current path
+        if(e._path && e._pathIndex < e._path.length){
+          const targetTile = e._path[e._pathIndex];
+          const tx = targetTile.x + 0.5, ty = targetTile.y + 0.5; // Target center of tile
+          const dirx = clamp(tx - e.x, -1, 1), diry = clamp(ty - e.y, -1, 1);
+          const edx = dirx * e.speed * dt, edy = diry * e.speed * dt;
+          this.tryMove(e, edx, edy);
+          // If close enough to target tile center, advance to next tile in path
+          if(Math.hypot(e.x - tx, e.y - ty) < 0.28) e._pathIndex++;
+        } else {
+          // If no path, move directly towards player (might get stuck on walls)
+          const dirx = clamp(dxp, -1, 1), diry = clamp(dyp, -1, 1);
+          const edx = dirx * e.speed * dt, edy = diry * e.speed * dt;
+          this.tryMove(e, edx, edy);
+        }
+
+        // Check for melee contact damage (player-enemy overlap)
+        if(distToPlayer < 0.6){
+          if(!e._atkCooldown || e._atkCooldown <= 0){
+            this.player.hp -= 6; e._atkCooldown = 0.8; // Enemy attacks every 0.8s
+            if(this.player.hp <= 0){ this.player.hp = 0; this.running = false; setTimeout(()=>alert('Вы погибли — перезагрузите страницу для новой игры.'), 50); }
+          }
+        }
+      }
+      e._atkCooldown = Math.max(0, (e._atkCooldown||0) - dt); // Update cooldown
+    }
+  }
+
+  update(dt){
+    const p = this.player;
+
+    // Player movement
+    const forward = this.input.moveY; const strafe  = this.input.moveX;
+    const movSpeed = p.speed * dt;
+    const dx = Math.cos(p.angle) * forward * movSpeed - Math.sin(p.angle) * strafe * movSpeed;
+    const dy = Math.sin(p.angle) * forward * movSpeed + Math.cos(p.angle) * strafe * movSpeed;
+    this.tryMove(p, dx, dy);
+
+    // Player rotation (camera)
+    p.angle += this.input.lookDX;
+    this.input.lookDX = lerp(this.input.lookDX, 0, dt * 10); // Smoother stop for rotation
+
+    // Handle shooting (projectiles)
+    this.tryShoot(dt);
+    this.updateProjectiles(dt);
+
+    // Enemies update
+    this.updateEnemies(dt);
+
+    // Update HUD
+    this.hpEl.textContent = 'HP: ' + Math.max(0, Math.floor(p.hp));
+    this.lvlEl.textContent = 'LVL: ' + p.level;
+  }
+
+  tryMove(ent, dx, dy){
+    const newX = ent.x + dx; const newY = ent.y + dy;
+    const collide = (x,y) => this.state.map.isWall(Math.floor(x), Math.floor(y));
+    const radius = 0.28; // Entity collision radius
+    // Test all four corners of the entity's bounding box
+    if(!collide(newX - radius, newY - radius) && !collide(newX + radius, newY - radius) &&
+       !collide(newX - radius, newY + radius) && !collide(newX + radius, newY + radius)){
+      ent.x = newX; ent.y = newY;
+    } else {
+      // Try moving along one axis if both blocked
+      if(!collide(ent.x + dx, ent.y)) ent.x += dx;
+      else if(!collide(ent.x, ent.y + dy)) ent.y += dy;
+    }
+  }
+}
+
+/* ----------------
+   Initialization
+   ---------------- */
+const canvas = document.getElementById('game');
+function fitCanvasToParent(){
+  const w = window.innerWidth; const h = window.innerHeight;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+}
+fitCanvasToParent();
+window.addEventListener('resize', fitCanvasToParent);
+
+const game = new Game(canvas);
+console.log('Projectile prototype loaded. Map size:', config.mapSize, 'Rooms:', game.state.map.rooms.length);
+
+</script>
 </body>
 </html>
