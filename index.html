@@ -1,45 +1,398 @@
- 
 <!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>Shuterok — touch-only (updated)</title>
+<title>Shuterok — улучшенный движок</title>
 <style>
-  :root{--accent:#4fc3f7; --ui-size:16px;}
-  html,body{height:100%; margin:0; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color: transparent; background:#000; font-family:system-ui,Segoe UI,Roboto,Arial;}
-  #gameWrap{position:relative; height:100vh; width:100vw; overflow:hidden;}
-  canvas{display:block; width:100%; height:100%; background:#111; touch-action:none;}
-  #settingsBtn{position:absolute; right:12px; top:12px; z-index:1100; width:44px; height:44px; border-radius:10px; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; color:#fff; border:1px solid rgba(255,255,255,0.06); box-shadow:0 6px 18px rgba(0,0,0,0.5);}
-  #fireBtn{position:absolute; z-index:1050; width:72px; height:72px; border-radius:50%; background: radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow: 0 8px 24px rgba(255,84,0,0.28); display:flex; align-items:center; justify-content:center; color:#111; font-weight:700; user-select:none; touch-action:none;}
-  #settingsOverlay{position:absolute; inset:0; z-index:1200; display:none; align-items:flex-start; justify-content:center; background:linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.65)); padding:18px;}
-  #settingsPanel{width:min(96vw,540px); background:#0f1113; color:#e6eef6; border-radius:12px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.6);}
-  #settingsPanel h2{margin:4px 0 8px; font-size:18px;}
-  .row{display:flex; gap:10px; align-items:center; margin:8px 0;}
-  label{font-size:13px; color:#cfe9ff;}
-  .range{width:100%;}
-  .btn-row{display:flex; gap:8px; justify-content:flex-end; margin-top:12px;}
-  .btn{padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600;}
-  .btn.ghost{background:transparent; color:#cfe9ff; border:1px solid rgba(255,255,255,0.06);}
-  .btn.primary{background:var(--accent); color:#042; border:none;}
-  #joystickPreview, #firePreview{width:200px; height:200px; background:linear-gradient(180deg,#0b0d0f,#0f1316); border-radius:12px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:none;}
-  #previewPad{position:absolute; inset:12px; border-radius:8px; background:rgba(255,255,255,0.02);}
-  #previewStick{position:absolute; width:56px; height:56px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #9df0ff, #04a6d6); box-shadow: 0 6px 20px rgba(4,166,214,0.25); touch-action:none;}
-  #previewFire{position:absolute; width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 30% 30%, #ffd97a, #ff5400); box-shadow:0 6px 18px rgba(255,84,0,0.18); touch-action:none;}
-  .sectionTitle{font-size:13px; color:#9fd9ff; margin-top:6px;}
-  .info{font-size:12px; color:#9fbcd6;}
-  @media (max-width:520px){ #joystickPreview,#firePreview{width:160px;height:160px;} #settingsPanel{padding:12px;} }
+  /* ===== Стили (оставляем почти без изменений) ===== */
+  :root {
+    --accent: #4fc3f7;
+    --ui-size: 16px;
+    --bg-dark: #0a0c0f;
+    --panel-bg: #0f1113;
+    --text-light: #e6eef6;
+  }
+  
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    background: var(--bg-dark);
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    touch-action: none;
+  }
+  
+  #gameWrap {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background: #000;
+  }
+  
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #111;
+    touch-action: none;
+    cursor: none;
+  }
+  
+  /* ===== Кнопки UI ===== */
+  #settingsBtn {
+    position: absolute;
+    right: 16px;
+    top: 16px;
+    z-index: 1100;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  
+  #settingsBtn:active {
+    transform: scale(0.92);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  #settingsBtn svg {
+    width: 22px;
+    height: 22px;
+  }
+  
+  #fireBtn {
+    position: absolute;
+    z-index: 1050;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffd97a, #ff5400);
+    box-shadow: 0 8px 28px rgba(255, 84, 0, 0.35), inset 0 -3px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a0a00;
+    font-weight: 700;
+    font-size: 32px;
+    user-select: none;
+    touch-action: none;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    will-change: transform;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  #fireBtn:active {
+    transform: scale(0.88);
+    box-shadow: 0 4px 16px rgba(255, 84, 0, 0.5), inset 0 2px 12px rgba(255, 200, 100, 0.4);
+  }
+  
+  /* ===== Панель настроек ===== */
+  #settingsOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding: 20px;
+    animation: fadeIn 0.25s ease;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  
+  #settingsPanel {
+    width: min(96vw, 560px);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    color: var(--text-light);
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  
+  #settingsPanel h2 {
+    margin: 0 0 12px 0;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  #settingsPanel h2::after {
+    content: '⚙️';
+    font-size: 18px;
+    opacity: 0.6;
+  }
+  
+  .sectionTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-top: 16px;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+  
+  .row {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin: 6px 0 10px 0;
+    flex-wrap: wrap;
+  }
+  
+  .row > * {
+    flex: 1;
+    min-width: 120px;
+  }
+  
+  label {
+    font-size: 13px;
+    color: #cfe9ff;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .range {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    outline: none;
+    transition: background 0.2s;
+  }
+  
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(79, 195, 247, 0.3);
+    transition: transform 0.15s;
+  }
+  
+  .range::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+  }
+  
+  .range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+  
+  /* ===== Превью джойстика ===== */
+  #joystickPreview,
+  #firePreview {
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle at 30% 30%, #14181c, #090b0d);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+  }
+  
+  #previewPad,
+  #previewPadFire {
+    position: absolute;
+    inset: 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.06);
+  }
+  
+  #previewStick {
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #9df0ff, #04a6d6);
+    box-shadow: 0 6px 24px rgba(4, 166, 214, 0.3);
+    touch-action: none;
+    transition: transform 0.1s ease;
+    will-change: transform, left, top;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  #previewFire {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffd97a, #ff5400);
+    box-shadow: 0 6px 20px rgba(255, 84, 0, 0.25);
+    touch-action: none;
+    will-change: transform, left, top;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  .info {
+    font-size: 11px;
+    color: #8aaccc;
+    margin-top: 4px;
+    line-height: 1.4;
+    opacity: 0.8;
+  }
+  
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  
+  .btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+  }
+  
+  .btn:active {
+    transform: scale(0.94);
+  }
+  
+  .btn.ghost {
+    background: rgba(255, 255, 255, 0.04);
+    color: #cfe9ff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .btn.ghost:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  
+  .btn.primary {
+    background: var(--accent);
+    color: #042;
+    border: none;
+    box-shadow: 0 4px 16px rgba(79, 195, 247, 0.25);
+  }
+  
+  .btn.primary:hover {
+    box-shadow: 0 6px 24px rgba(79, 195, 247, 0.35);
+    transform: translateY(-1px);
+  }
+  
+  /* ===== Адаптив ===== */
+  @media (max-width: 600px) {
+    #settingsPanel {
+      padding: 16px;
+    }
+    #joystickPreview,
+    #firePreview {
+      width: 140px;
+      height: 140px;
+    }
+    .row {
+      gap: 10px;
+    }
+    #previewStick {
+      width: 42px;
+      height: 42px;
+    }
+    #previewFire {
+      width: 38px;
+      height: 38px;
+    }
+    #settingsBtn {
+      width: 40px;
+      height: 40px;
+      right: 12px;
+      top: 12px;
+    }
+  }
+  
+  @media (max-width: 400px) {
+    #joystickPreview,
+    #firePreview {
+      width: 110px;
+      height: 110px;
+    }
+    #previewStick {
+      width: 34px;
+      height: 34px;
+    }
+    #previewFire {
+      width: 30px;
+      height: 30px;
+    }
+  }
+  
+  /* ===== Скролл-бар ===== */
+  #settingsPanel::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  #settingsPanel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  #settingsPanel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
 </style>
 </head>
 <body>
 <div id="gameWrap">
   <canvas id="gameCanvas" playsinline></canvas>
 
-  <div id="fireBtn" aria-label="Огонь">●</div>
+  <div id="fireBtn" aria-label="Огонь">⚡</div>
 
   <div id="settingsBtn" title="Настройки" aria-label="Настройки">
-    <!-- fixed, centered settings icon (no weird transform) -->
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 16.9l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.7 0 1.28-.41 1.51-1a1.65 1.65 0 0 0-.33-1.82L4.3 2.3A2 2 0 1 1 7.12.48l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 11.5 0H12a2 2 0 1 1 4 0h.09c.7 0 1.28.41 1.51 1 .13.41.45.76.86.96l.06.02a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82v.09c0 .7.41 1.28 1 1.51H21a2 2 0 1 1 0 4h-.09c-.41 0-.76.45-.96.86z"/>
     </svg>
@@ -55,7 +408,7 @@
           <div id="previewPad"></div>
           <div id="previewStick"></div>
         </div>
-        <div style="flex:1; display:flex; flex-direction:column;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
           <label>Масштаб стика <input id="joyScale" class="range" type="range" min="0.6" max="1.6" step="0.05"></label>
           <label>Размер области касания <input id="joySize" class="range" type="range" min="0.12" max="0.45" step="0.01"></label>
           <div class="info">Перетащите кружок в превью для установки позиции стика (относительно экрана).</div>
@@ -68,7 +421,7 @@
           <div id="previewPadFire"></div>
           <div id="previewFire"></div>
         </div>
-        <div style="flex:1; display:flex; flex-direction:column;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
           <label>Размер кнопки <input id="fireSize" class="range" type="range" min="36" max="110" step="2"></label>
           <div class="info">Перетащите кнопку в превью для установки позиции огня (относительно экрана).</div>
         </div>
@@ -76,14 +429,15 @@
 
       <div class="sectionTitle">Чувствительность</div>
       <div class="row">
-        <div style="flex:1;"><label>Движение <input id="sensMove" class="range" type="range" min="0.4" max="2.2" step="0.05"></label></div>
-        <div style="flex:1;"><label>Обзор (свайп) <input id="sensLook" class="range" type="range" min="0.4" max="2.6" step="0.05"></label></div>
+        <label>Движение <input id="sensMove" class="range" type="range" min="0.4" max="2.2" step="0.05"></label>
+        <label>Обзор (свайп) <input id="sensLook" class="range" type="range" min="0.4" max="2.6" step="0.05"></label>
       </div>
 
       <div class="sectionTitle">Графика</div>
-      <div class="row">
-        <label><input type="radio" name="gfxPreset" value="performance"> Performance</label>
-        <label><input type="radio" name="gfxPreset" value="quality"> Quality</label>
+      <div class="row" style="gap:20px;">
+        <label><input type="radio" name="gfxPreset" value="performance"> 🚀 Performance</label>
+        <label><input type="radio" name="gfxPreset" value="quality"> ✨ Quality</label>
+        <label><input type="radio" name="gfxPreset" value="ultra"> 🌟 Ultra</label>
       </div>
 
       <div class="btn-row">
@@ -96,513 +450,1096 @@
 </div>
 
 <script>
-/* ===== SETTINGS STORAGE (normalized coordinates 0..1) ===== */
-const STORAGE_KEY = 'shuterok_touch_v3';
+// ============================================================
+//  1. НАСТРОЙКИ И ХРАНИЛИЩЕ
+// ============================================================
+
+const STORAGE_KEY = 'shuterok_engine_v4';
+
 const defaultSettings = {
-  joystick: { x_pct: 0.12, y_pct: 0.78, scale: 1.0, hitArea: 0.22 }, // x_pct,y_pct normalized 0..1
-  fire: { x_pct: 0.92, y_pct: 0.78, size: 72 }, // normalized
+  joystick: { x_pct: 0.12, y_pct: 0.78, scale: 1.0, hitArea: 0.22 },
+  fire: { x_pct: 0.92, y_pct: 0.78, size: 72 },
   sensitivity: { move: 1.0, look: 1.0 },
-  graphics: { preset: 'performance' }
+  graphics: { preset: 'quality' }
 };
+
 let settings = loadSettings();
-function loadSettings(){ try{ const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); return s?mergeDefaults(s):structuredClone(defaultSettings);}catch(e){return structuredClone(defaultSettings);} }
-function mergeDefaults(s){ return {
-  joystick: Object.assign({}, defaultSettings.joystick, s.joystick||{}),
-  fire: Object.assign({}, defaultSettings.fire, s.fire||{}),
-  sensitivity: Object.assign({}, defaultSettings.sensitivity, s.sensitivity||{}),
-  graphics: Object.assign({}, defaultSettings.graphics, s.graphics||{})
-}; }
-function saveSettings(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
 
-/* ===== CANVAS & RENDERER ===== */
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(defaultSettings);
+    const parsed = JSON.parse(raw);
+    return mergeDefaults(parsed);
+  } catch {
+    return structuredClone(defaultSettings);
+  }
+}
+
+function mergeDefaults(s) {
+  return {
+    joystick: { ...defaultSettings.joystick, ...(s.joystick || {}) },
+    fire: { ...defaultSettings.fire, ...(s.fire || {}) },
+    sensitivity: { ...defaultSettings.sensitivity, ...(s.sensitivity || {}) },
+    graphics: { ...defaultSettings.graphics, ...(s.graphics || {}) }
+  };
+}
+
+function saveSettings() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+// ============================================================
+//  2. CANVAS И РЕНДЕРИНГ (ImageData)
+// ============================================================
+
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d', { alpha: false });
-let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-let paused = false;
-let lastFrameTs = 0;
+const ctx = canvas.getContext('2d');
 
-/* MAP & PLAYER */
-const map = { w:10, h:10, grid:[
-  1,1,1,1,1,1,1,1,1,1,
-  1,0,0,0,0,0,0,0,0,1,
-  1,0,0,0,1,1,0,0,0,1,
-  1,0,0,0,1,1,0,0,0,1,
-  1,0,0,0,0,0,0,1,0,1,
-  1,0,1,0,0,0,0,1,0,1,
-  1,0,1,0,0,0,0,0,0,1,
-  1,0,0,0,0,0,0,0,0,1,
-  1,0,0,0,0,0,0,0,0,1,
-  1,1,1,1,1,1,1,1,1,1
-], at(x,y){ if(x<0||y<0||x>=this.w||y>=this.h) return 1; return this.grid[y*this.w + x]; }};
-const player = { x:2.5, y:2.5, ang:0, fov:Math.PI/3.0, height:0.5 };
-let movement = { forward:0, strafe:0, turn:0 };
-let moveSpeedBase = 2.6, turnSpeedBase = 2.8;
-let rendererState = { pixelRatio:1, columnsFactor:0.6, columns:120 };
+let canvasWidth = 0;
+let canvasHeight = 0;
+let DPR = 1;
 
-function applyGraphicsPreset(){ if(settings.graphics.preset==='performance'){ rendererState.pixelRatio = Math.min(1.0, DPR*0.9); rendererState.columnsFactor = 0.55; } else { rendererState.pixelRatio = Math.min(1.5, DPR*1.0); rendererState.columnsFactor = 1.0; } resizeCanvas(); }
-function resizeCanvas(){ const cssW = window.innerWidth, cssH = window.innerHeight; canvas.style.width = cssW+'px'; canvas.style.height = cssH+'px'; canvas.width = Math.max(300, Math.floor(cssW * rendererState.pixelRatio)); canvas.height = Math.max(200, Math.floor(cssH * rendererState.pixelRatio)); rendererState.columns = Math.max(40, Math.floor(canvas.width * 0.6 * rendererState.columnsFactor)); }
-
-/* ===== RAYCAST & RENDER (kept simple) ===== */
-function castRays(){ const w=canvas.width,h=canvas.height, halfH=h*0.5, step=player.fov/rendererState.columns; let rayAng=player.ang-player.fov/2; for(let i=0;i<rendererState.columns;i++,rayAng+=step){ const dx=Math.cos(rayAng), dy=Math.sin(rayAng); let dist=0, hit=false, side=0; while(!hit && dist<20){ dist+=0.02*(1+Math.floor(rendererState.columns/220)); const rx=player.x+dx*dist, ry=player.y+dy*dist; if(map.at(Math.floor(rx),Math.floor(ry))===1){ hit=true; const sx=Math.floor(rx), cy=ry-Math.floor(ry); side=( (rx-Math.floor(rx))<0.2 || (rx-Math.floor(rx))>0.8)?0:1; } } const fish=Math.cos(rayAng-player.ang); const proj=(player.fov/(dist||0.0001))*(canvas.width*0.4); const lineH=Math.min(canvas.height*2, Math.max(2, Math.floor(proj/fish))); const x=Math.floor((i/rendererState.columns)*canvas.width); const shade=Math.max(0.2, Math.min(1, 1.6-dist*0.11)); const col=side?Math.floor(60*shade):Math.floor(180*shade); ctx.fillStyle=`rgb(${col},${col},${col})`; ctx.fillRect(x, Math.ceil((canvas.height-lineH)/2), Math.max(1, Math.ceil(canvas.width/rendererState.columns)), lineH); } }
-function drawMiniMap(){ const size=Math.min(160, Math.floor(canvas.width*0.18)), pad=10*rendererState.pixelRatio, sx=pad, sy=pad, cell=(size-pad*2)/map.w; ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(sx-6, sy-6, size+12, size+12); for(let y=0;y<map.h;y++){ for(let x=0;x<map.w;x++){ ctx.fillStyle = map.at(x,y)?'#aaaaaa':'#1a1a1a'; ctx.fillRect(sx + x*cell, sy + y*cell, Math.ceil(cell), Math.ceil(cell)); } } ctx.fillStyle='#ffeb3b'; ctx.beginPath(); ctx.arc(sx + player.x*cell, sy + player.y*cell, Math.max(2, cell*0.25), 0, Math.PI*2); ctx.fill(); ctx.strokeStyle='#ffd54f'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(sx + player.x*cell, sy + player.y*cell); ctx.lineTo(sx + (player.x + Math.cos(player.ang)*0.8)*cell, sy + (player.y + Math.sin(player.ang)*0.8)*cell); ctx.stroke(); ctx.restore(); }
-
-/* HUD / shot flash */
-let lastShotTs = 0;
-
-/* bullets & hit effects (projectile simplified) */
-let bullets = []; // {x,y,dirX,dirY,speed,radius,ttl}
-let hitEffects = []; // {screenX,screenY,size,ttl,created}
-
-/* simple weapon config */
-const weapon = { muzzleOffset: 0.28, bulletSpeed: 8.0, bulletRadiusPx: 4, bulletTTL: 1.8, hitSpriteSize: 22, hitSpriteTTL: 260 };
-
-/* render base */
-function renderBase(){
-  ctx.fillStyle='#20242a'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  const skyGrad = ctx.createLinearGradient(0,0,0,canvas.height*0.6);
-  skyGrad.addColorStop(0,'#6fa4d6'); skyGrad.addColorStop(1,'#225a8a');
-  ctx.fillStyle = skyGrad; ctx.fillRect(0,0,canvas.width,canvas.height*0.5);
-  ctx.fillStyle = '#2d2f33'; ctx.fillRect(0, canvas.height*0.5, canvas.width, canvas.height*0.5);
-  castRays(); drawMiniMap();
-  // shot flash
-  if (performance.now() - lastShotTs < 120) {
-    ctx.save();
-    ctx.globalAlpha = 0.9 - (performance.now() - lastShotTs) / 120;
-    ctx.fillStyle = 'rgba(255,220,120,0.85)';
-    const cx = canvas.width*0.5, cy = canvas.height*0.5;
-    ctx.beginPath(); ctx.arc(cx, cy, Math.min(canvas.width, canvas.height)*0.06, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  }
-}
-
-/* draw crosshair (center) */
-function drawCrosshair(){
-  const cx = canvas.width*0.5, cy = canvas.height*0.5;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,240,200,0.95)';
-  ctx.lineWidth = Math.max(2, Math.floor(2 * rendererState.pixelRatio));
-  const size = Math.max(10, Math.floor(12 * rendererState.pixelRatio));
-  ctx.beginPath();
-  ctx.moveTo(cx - size, cy); ctx.lineTo(cx - 4, cy);
-  ctx.moveTo(cx + size, cy); ctx.lineTo(cx + 4, cy);
-  ctx.moveTo(cx, cy - size); ctx.lineTo(cx, cy - 4);
-  ctx.moveTo(cx, cy + size); ctx.lineTo(cx, cy + 4);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/* draw bullets & hit effects (over HUD) */
-function drawProjectilesAndEffects(){
-  // bullets
-  ctx.save();
-  for (let b of bullets){
-    // draw small circle in screen space: we need to project world pos roughly to screen
-    const sp = worldToScreen(b.x, b.y);
-    if (!sp) continue;
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(255,220,120,0.95)';
-    ctx.arc(sp.x, sp.y, Math.max(2, b.radius), 0, Math.PI*2);
-    ctx.fill();
-  }
-  // hit effects
-  const now = performance.now();
-  for (let i = hitEffects.length-1; i>=0; i--){
-    const e = hitEffects[i];
-    const age = now - e.created;
-    if (age > e.ttl){ hitEffects.splice(i,1); continue; }
-    const a = 1 - (age / e.ttl);
-    ctx.save();
-    ctx.globalAlpha = a;
-    const s = e.size * (1 + (1 - a)*0.25);
-    const grad = ctx.createRadialGradient(e.screenX, e.screenY, 0, e.screenX, e.screenY, s);
-    grad.addColorStop(0, 'rgba(255,240,200,0.95)');
-    grad.addColorStop(0.4, 'rgba(255,180,90,0.8)');
-    grad.addColorStop(1, 'rgba(120,40,20,0.0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(e.screenX, e.screenY, s, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
-  ctx.restore();
-}
-
-/* MAIN LOOP */
-function update(dt){
-  const moveSpeed = moveSpeedBase * settings.sensitivity.move;
-  const turnSpeed = turnSpeedBase * settings.sensitivity.look;
-  const forwardVel = movement.forward * moveSpeed * dt;
-  const strafeVel = movement.strafe * moveSpeed * dt;
-  const nx = player.x + Math.cos(player.ang) * forwardVel - Math.sin(player.ang) * strafeVel;
-  const ny = player.y + Math.sin(player.ang) * forwardVel + Math.cos(player.ang) * strafeVel;
-  if(map.at(Math.floor(nx), Math.floor(player.y))===0) player.x = nx;
-  if(map.at(Math.floor(player.x), Math.floor(ny))===0) player.y = ny;
-  player.ang += movement.turn * turnSpeed * dt;
-
-  // bullets update
-  for (let i = bullets.length-1; i>=0; i--){
-    const b = bullets[i];
-    b.x += b.dirX * b.speed * dt;
-    b.y += b.dirY * b.speed * dt;
-    b.ttl -= dt;
-    // collision with world
-    if (map.at(Math.floor(b.x), Math.floor(b.y))===1 || b.ttl <= 0){
-      // spawn hit effect projected to screen
-      const sp = worldToScreen(b.x, b.y);
-      if (sp){
-        hitEffects.push({ screenX: sp.x, screenY: sp.y, size: weapon.hitSpriteSize, ttl: weapon.hitSpriteTTL, created: performance.now() });
+const renderer = {
+  imageData: null,
+  data: null,
+  
+  init() {
+    this.imageData = ctx.createImageData(canvasWidth, canvasHeight);
+    this.data = this.imageData.data;
+  },
+  
+  clear() {
+    this.data.fill(0);
+  },
+  
+  setPixel(x, y, r, g, b) {
+    if (x < 0 || x >= canvasWidth || y < 0 || y >= canvasHeight) return;
+    const idx = (y * canvasWidth + x) * 4;
+    this.data[idx] = r;
+    this.data[idx + 1] = g;
+    this.data[idx + 2] = b;
+    this.data[idx + 3] = 255;
+  },
+  
+  drawColumn(x, yTop, yBottom, shade, side, wallX) {
+    // Цвет стены с текстурой (простая градиентная)
+    const brightness = Math.max(0.15, Math.min(1.0, shade));
+    const baseR = side === 0 ? 160 : 120;
+    const baseG = side === 0 ? 140 : 100;
+    const baseB = side === 0 ? 100 : 70;
+    
+    // Эффект текстуры (полосы по wallX)
+    const texFactor = Math.sin(wallX * 40) * 0.08 + 0.92;
+    
+    const r = Math.floor(baseR * brightness * texFactor);
+    const g = Math.floor(baseG * brightness * texFactor);
+    const b = Math.floor(baseB * brightness * texFactor);
+    
+    const yStart = Math.max(0, yTop);
+    const yEnd = Math.min(canvasHeight - 1, yBottom);
+    
+    for (let y = yStart; y <= yEnd; y++) {
+      const idx = (y * canvasWidth + x) * 4;
+      this.data[idx] = r;
+      this.data[idx + 1] = g;
+      this.data[idx + 2] = b;
+      this.data[idx + 3] = 255;
+    }
+  },
+  
+  drawFloorCeiling() {
+    // Пол и потолок — градиент
+    const halfH = canvasHeight / 2;
+    for (let y = 0; y < canvasHeight; y++) {
+      const isCeiling = y < halfH;
+      const t = isCeiling ? y / halfH : (y - halfH) / halfH;
+      const brightness = isCeiling ? 0.3 + t * 0.5 : 0.15 + t * 0.3;
+      
+      const r = Math.floor(80 * brightness);
+      const g = Math.floor(100 * brightness);
+      const b = Math.floor(130 * brightness);
+      
+      for (let x = 0; x < canvasWidth; x++) {
+        const idx = (y * canvasWidth + x) * 4;
+        this.data[idx] = r;
+        this.data[idx + 1] = g;
+        this.data[idx + 2] = b;
+        this.data[idx + 3] = 255;
       }
-      bullets.splice(i,1);
+    }
+  },
+  
+  render() {
+    ctx.putImageData(this.imageData, 0, 0);
+  }
+};
+
+// ============================================================
+//  3. КАРТА (20x20 с комнатами и коридорами)
+// ============================================================
+
+class Map {
+  constructor(size = 20) {
+    this.size = size;
+    this.grid = [];
+    this.generate();
+  }
+  
+  generate() {
+    const s = this.size;
+    this.grid = Array(s * s).fill(1);
+    
+    // Комнаты
+    const rooms = [
+      { x: 2, y: 2, w: 5, h: 5 },
+      { x: 13, y: 2, w: 5, h: 5 },
+      { x: 2, y: 13, w: 5, h: 5 },
+      { x: 13, y: 13, w: 5, h: 5 },
+      { x: 7, y: 7, w: 6, h: 6 }
+    ];
+    
+    rooms.forEach(r => {
+      for (let i = r.x; i < r.x + r.w; i++) {
+        for (let j = r.y; j < r.y + r.h; j++) {
+          if (i < s && j < s) this.grid[j * s + i] = 0;
+        }
+      }
+    });
+    
+    // Коридоры
+    const corridors = [
+      [[4, 4], [4, 7]], [[4, 7], [7, 7]],
+      [[16, 4], [16, 7]], [[16, 7], [13, 7]],
+      [[4, 16], [4, 13]], [[4, 13], [7, 13]],
+      [[16, 16], [16, 13]], [[16, 13], [13, 13]],
+      [[7, 10], [10, 10]], [[10, 10], [10, 7]],
+      [[7, 10], [7, 13]], [[10, 10], [13, 10]]
+    ];
+    
+    corridors.forEach(([from, to]) => {
+      let [x, y] = from;
+      while (x !== to[0] || y !== to[1]) {
+        if (x < to[0]) x++;
+        else if (x > to[0]) x--;
+        else if (y < to[1]) y++;
+        else if (y > to[1]) y--;
+        if (x >= 0 && x < s && y >= 0 && y < s) {
+          this.grid[y * s + x] = 0;
+        }
+      }
+    });
+    
+    // Добавляем пару колонн для красоты
+    const pillars = [[9, 5], [10, 5], [9, 14], [10, 14]];
+    pillars.forEach(([x, y]) => {
+      if (x < s && y < s) this.grid[y * s + x] = 1;
+    });
+  }
+  
+  at(x, y) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    if (xi < 0 || xi >= this.size || yi < 0 || yi >= this.size) return 1;
+    return this.grid[yi * this.size + xi];
+  }
+  
+  isWall(x, y) {
+    return this.at(x, y) === 1;
+  }
+}
+
+// ============================================================
+//  4. ИГРОК
+// ============================================================
+
+class Player {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.angle = 0;
+    this.fov = Math.PI / 2.8;
+    this.height = 0.5;
+    this.moveSpeed = 3.0;
+    this.turnSpeed = 2.5;
+    this.radius = 0.25;
+  }
+  
+  get direction() {
+    return { x: Math.cos(this.angle), y: Math.sin(this.angle) };
+  }
+  
+  move(dx, dy, map) {
+    const newX = this.x + dx;
+    const newY = this.y + dy;
+    
+    // Проверка по X
+    if (!map.isWall(newX + this.radius, this.y) && 
+        !map.isWall(newX - this.radius, this.y)) {
+      this.x = newX;
+    }
+    
+    // Проверка по Y
+    if (!map.isWall(this.x, newY + this.radius) && 
+        !map.isWall(this.x, newY - this.radius)) {
+      this.y = newY;
     }
   }
-
-  // hitEffects cleanup handled during draw
 }
 
-function loop(ts){
-  if(paused){ lastFrameTs = ts; requestAnimationFrame(loop); return; }
-  if(!lastFrameTs) lastFrameTs = ts;
-  const dt = Math.min(0.05, (ts-lastFrameTs)/1000);
-  lastFrameTs = ts;
-  update(dt);
-  render();
-  requestAnimationFrame(loop);
+// ============================================================
+//  5. РЕЙКАСТИНГ (DDA)
+// ============================================================
+
+function castRay(px, py, angle, map) {
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  
+  let x = px;
+  let y = py;
+  
+  const stepX = dx > 0 ? 1 : -1;
+  const stepY = dy > 0 ? 1 : -1;
+  
+  let tMaxX = dx > 0 ? (Math.floor(x) + 1 - x) / dx : (x - Math.floor(x)) / -dx;
+  let tMaxY = dy > 0 ? (Math.floor(y) + 1 - y) / dy : (y - Math.floor(y)) / -dy;
+  
+  const tDeltaX = 1 / Math.abs(dx);
+  const tDeltaY = 1 / Math.abs(dy);
+  
+  let hit = false;
+  let side = 0;
+  let wallX = 0;
+  let distance = 0;
+  
+  let iterations = 0;
+  const maxIter = 30;
+  
+  while (!hit && iterations < maxIter) {
+    iterations++;
+    
+    if (tMaxX < tMaxY) {
+      x += stepX * 0.001;
+      tMaxX += tDeltaX;
+      side = 0;
+    } else {
+      y += stepY * 0.001;
+      tMaxY += tDeltaY;
+      side = 1;
+    }
+    
+    if (map.isWall(x, y)) {
+      hit = true;
+      distance = Math.hypot(x - px, y - py);
+      wallX = side === 0 ? y - Math.floor(y) : x - Math.floor(x);
+    }
+  }
+  
+  if (!hit) {
+    distance = 20;
+    wallX = 0.5;
+  }
+  
+  return { distance, side, wallX };
 }
 
-/* ===== STICK STATE & helpers (left) ===== */
-let activeStickId = null;
-let stickState = { centerX:0, centerY:0, radius:60, knobX:0, knobY:0, pressed:false };
+// ============================================================
+//  6. СИСТЕМА ПУЛЬ
+// ============================================================
 
-/* unified function: compute center px from normalized settings */
-function getStickCenterPx(){
-  const w = window.innerWidth, h = window.innerHeight;
-  const x = Math.round(Math.max(0.02, Math.min(0.98, settings.joystick.x_pct)) * w);
-  const y = Math.round(Math.max(0.02, Math.min(0.98, settings.joystick.y_pct)) * h);
-  return { x, y };
+class Bullet {
+  constructor(x, y, angle, speed = 10) {
+    this.x = x;
+    this.y = y;
+    this.dirX = Math.cos(angle);
+    this.dirY = Math.sin(angle);
+    this.speed = speed;
+    this.radius = 0.08;
+    this.life = 2.5;
+    this.alive = true;
+  }
+  
+  update(dt, map) {
+    if (!this.alive) return;
+    
+    this.x += this.dirX * this.speed * dt;
+    this.y += this.dirY * this.speed * dt;
+    this.life -= dt;
+    
+    if (this.life <= 0 || map.isWall(this.x, this.y)) {
+      this.alive = false;
+    }
+  }
+  
+  get screenPos(player, canvasW, canvasH) {
+    const dx = this.x - player.x;
+    const dy = this.y - player.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.01) return null;
+    
+    const angle = Math.atan2(dy, dx);
+    let angleDiff = angle - player.angle;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    
+    const halfFov = player.fov / 2;
+    if (Math.abs(angleDiff) > halfFov + 0.2) return null;
+    
+    const relX = (angleDiff / player.fov) + 0.5;
+    const screenX = relX * canvasW;
+    
+    // Высота на экране (чем ближе — тем выше)
+    const heightFactor = 1 - Math.min(1, dist / 15);
+    const screenY = canvasH / 2 - heightFactor * canvasH * 0.2;
+    
+    return { x: screenX, y: screenY };
+  }
 }
-function resetStickFromSettings(){
-  const w = window.innerWidth, h = window.innerHeight;
-  stickState.radius = Math.max(36, Math.floor(Math.min(w,h) * settings.joystick.hitArea * settings.joystick.scale));
-  const c = getStickCenterPx();
-  stickState.centerX = c.x; stickState.centerY = c.y;
-  stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
+
+// ============================================================
+//  7. ОСНОВНОЙ ЦИКЛ
+// ============================================================
+
+const map = new Map(20);
+const player = new Player(10, 10);
+const bullets = [];
+const hitEffects = [];
+
+let movement = { forward: 0, strafe: 0, turn: 0 };
+let lastShotTime = 0;
+const shotCooldown = 0.12;
+let lastFrameTime = 0;
+let isPaused = false;
+
+// ============================================================
+//  8. УПРАВЛЕНИЕ (ДЖОЙСТИК + СВАЙП)
+// ============================================================
+
+let stickState = {
+  activeId: null,
+  centerX: 0,
+  centerY: 0,
+  radius: 60,
+  knobX: 0,
+  knobY: 0,
+  pressed: false
+};
+
+let lookState = {
+  activeId: null,
+  lastX: 0
+};
+
+function getStickCenter() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  return {
+    x: Math.round(Math.max(0.04, Math.min(0.96, settings.joystick.x_pct)) * w),
+    y: Math.round(Math.max(0.04, Math.min(0.96, settings.joystick.y_pct)) * h)
+  };
 }
-resetStickFromSettings();
 
-function drawStickOverlay(){
-  ctx.save();
-  ctx.globalAlpha = 0.75;
-  ctx.beginPath(); ctx.fillStyle='rgba(10,10,13,0.15)'; ctx.arc(stickState.centerX, stickState.centerY, stickState.radius*1.2, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.fillStyle='rgba(80,200,255,0.95)'; ctx.arc(stickState.knobX, stickState.knobY, Math.max(12, stickState.radius*0.36), 0, Math.PI*2); ctx.fill();
-  ctx.restore();
+function resetStick() {
+  const center = getStickCenter();
+  stickState.centerX = center.x;
+  stickState.centerY = center.y;
+  stickState.radius = Math.max(40, Math.min(window.innerWidth, window.innerHeight) * 
+                              settings.joystick.hitArea * settings.joystick.scale);
+  stickState.knobX = stickState.centerX;
+  stickState.knobY = stickState.centerY;
+  movement.forward = 0;
+  movement.strafe = 0;
 }
 
-/* mapping helpers for movement (left stick only affects movement: forward + strafe) */
-function computeForwardFromKnob(){ const dy = (stickState.knobY - stickState.centerY); const norm = Math.max(1, stickState.radius); return Math.max(-1, Math.min(1, -(dy / norm))); }
-function computeStrafeFromKnob(){ const dx = (stickState.knobX - stickState.centerX); const norm = Math.max(1, stickState.radius); return Math.max(-1, Math.min(1, (dx / norm))); }
-
-/* ===== LOOK (right side swipe) ===== */
-let activeLookId = null;
-let lastLookX = 0;
-function startLook(pointerId, x){ activeLookId = pointerId; lastLookX = x; }
-function moveLook(x){ if(activeLookId === null) return; const dx = x - lastLookX; lastLookX = x; const factor = (Math.PI * 0.9) / window.innerWidth; player.ang += dx * factor * settings.sensitivity.look; }
-function endLook(pid){ if(activeLookId === pid){ activeLookId = null; lastLookX = 0; } }
-
-/* ===== WORLD -> SCREEN projection helper (approximate using angle) =====
-   returns {x,y} in canvas pixel coords or null if not projectable
-*/
-function normalizeAngle(a){ while(a <= -Math.PI) a += Math.PI*2; while(a > Math.PI) a -= Math.PI*2; return a; }
-function worldToScreen(wx, wy){
-  const dx = wx - player.x, dy = wy - player.y;
-  const ang = Math.atan2(dy, dx);
-  let angDiff = normalizeAngle(ang - player.ang);
-  // If outside fov, still clamp to edge
-  const halfFov = player.fov * 0.5;
-  if (angDiff < -halfFov) angDiff = -halfFov;
-  if (angDiff > halfFov) angDiff = halfFov;
-  const rel = angDiff / player.fov; // -0.5..0.5
-  const sx = Math.round((0.5 + rel) * canvas.width);
-  // approximate vertical position by distance: closer => center, farther => slightly lower
+function updateStickFromTouch(clientX, clientY) {
+  const dx = clientX - stickState.centerX;
+  const dy = clientY - stickState.centerY;
   const dist = Math.hypot(dx, dy);
-  const sy = Math.round(canvas.height*0.5 + Math.min(canvas.height*0.22, (dist-1) * 6 * rendererState.pixelRatio));
-  return { x: sx, y: sy };
-}
-
-/* ===== FIRE BUTTON & weapon (DOM) ===== */
-const fireBtn = document.getElementById('fireBtn');
-function updateFireButtonPosition(){ const w = window.innerWidth, h = window.innerHeight; const px = Math.round(Math.max(0.02, Math.min(0.98, settings.fire.x_pct)) * w); const py = Math.round(Math.max(0.02, Math.min(0.98, settings.fire.y_pct)) * h); const size = Math.max(36, Math.min(140, settings.fire.size)); fireBtn.style.width = size + 'px'; fireBtn.style.height = size + 'px'; fireBtn.style.left = (px - size/2) + 'px'; fireBtn.style.top = (py - size/2) + 'px'; fireBtn.style.lineHeight = size + 'px'; fireBtn.style.fontSize = Math.max(18, Math.floor(size*0.42)) + 'px'; }
-updateFireButtonPosition();
-
-function spawnBullet(){
-  // muzzle spawn in world coords
-  const mx = player.x + Math.cos(player.ang) * weapon.muzzleOffset;
-  const my = player.y + Math.sin(player.ang) * weapon.muzzleOffset;
-  const dirX = Math.cos(player.ang), dirY = Math.sin(player.ang);
-  bullets.push({ x: mx, y: my, dirX, dirY, speed: weapon.bulletSpeed, radius: weapon.bulletRadiusPx, ttl: weapon.bulletTTL });
-  lastShotTs = performance.now();
-}
-
-/* pointer handlers for fire button (touch only) */
-fireBtn.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse') return;
-  try{ fireBtn.setPointerCapture(e.pointerId); }catch(_){}
-  spawnBullet();
-});
-fireBtn.addEventListener('pointerup', (e) => { try{ fireBtn.releasePointerCapture(e.pointerId); }catch(_){ } });
-fireBtn.addEventListener('pointercancel', (e) => { try{ fireBtn.releasePointerCapture(e.pointerId); }catch(_){ } });
-
-/* ===== TOUCH INPUT: separation of left stick and right swipe ===== */
-/* pointerdown on canvas decides: left stick (by proximity to stick center) OR right-side look */
-canvas.addEventListener('pointerdown', (e) => {
-  if (paused) return;
-  if (e.pointerType === 'mouse') return;
-  const x = e.clientX, y = e.clientY, w = window.innerWidth;
-  const fireRect = fireBtn.getBoundingClientRect();
-  if (x >= fireRect.left && x <= fireRect.right && y >= fireRect.top && y <= fireRect.bottom) {
-    // let fire button handle it
+  const max = stickState.radius;
+  
+  // Мертвая зона 5%
+  const deadZone = max * 0.05;
+  
+  if (dist < deadZone) {
+    stickState.knobX = stickState.centerX;
+    stickState.knobY = stickState.centerY;
+    movement.forward = 0;
+    movement.strafe = 0;
     return;
   }
-  // compute stick center freshly (in case settings changed)
-  const sc = getStickCenterPx();
-  const distToStick = Math.hypot(x - sc.x, y - sc.y);
-  const hitCircle = distToStick <= Math.max( (stickState.radius || 60) * 1.25, 80 );
-  const inLeft = x <= w * 0.5;
-  if ((inLeft || hitCircle) && activeStickId === null) {
-    activeStickId = e.pointerId;
+  
+  let kx = clientX;
+  let ky = clientY;
+  let normalizedDist = dist;
+  
+  if (dist > max) {
+    kx = stickState.centerX + dx * (max / dist);
+    ky = stickState.centerY + dy * (max / dist);
+    normalizedDist = max;
+  }
+  
+  stickState.knobX = kx;
+  stickState.knobY = ky;
+  
+  const factor = (normalizedDist - deadZone) / (max - deadZone);
+  const angle = Math.atan2(dy, dx);
+  
+  movement.forward = Math.cos(angle) * factor;
+  movement.strafe = Math.sin(angle) * factor;
+}
+
+// ============================================================
+//  9. ОБРАБОТЧИКИ СОБЫТИЙ
+// ============================================================
+
+function setupInput() {
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerCancel);
+  canvas.addEventListener('pointerleave', onPointerCancel);
+  
+  // Огонь
+  const fireBtn = document.getElementById('fireBtn');
+  fireBtn.addEventListener('pointerdown', onFireDown);
+  fireBtn.addEventListener('pointerup', onFireUp);
+  fireBtn.addEventListener('pointercancel', onFireUp);
+}
+
+function onPointerDown(e) {
+  if (isPaused || e.pointerType === 'mouse') return;
+  
+  const x = e.clientX;
+  const y = e.clientY;
+  const w = window.innerWidth;
+  
+  // Проверяем, не попали ли в кнопку огня
+  const fireRect = document.getElementById('fireBtn').getBoundingClientRect();
+  if (x >= fireRect.left && x <= fireRect.right && 
+      y >= fireRect.top && y <= fireRect.bottom) {
+    return;
+  }
+  
+  // Проверяем, попали ли в зону джойстика (левая половина или близко к центру)
+  const center = getStickCenter();
+  const distToCenter = Math.hypot(x - center.x, y - center.y);
+  const isInStickZone = (x < w * 0.5) || (distToCenter < stickState.radius * 2);
+  
+  if (isInStickZone && stickState.activeId === null) {
+    stickState.activeId = e.pointerId;
     stickState.pressed = true;
-    stickState.centerX = sc.x; stickState.centerY = sc.y; // ensure it's exact
-    // clamp knob
-    const dx = x - stickState.centerX, dy = y - stickState.centerY, d = Math.hypot(dx,dy), max = stickState.radius;
-    let kx = x, ky = y;
-    if (d > max){ kx = stickState.centerX + dx * (max / d); ky = stickState.centerY + dy * (max / d); }
-    stickState.knobX = kx; stickState.knobY = ky;
-    movement.forward = computeForwardFromKnob();
-    movement.strafe = computeStrafeFromKnob();
-    // IMPORTANT: do NOT set movement.turn from left stick
-    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+    const c = getStickCenter();
+    stickState.centerX = c.x;
+    stickState.centerY = c.y;
+    updateStickFromTouch(x, y);
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
     return;
   }
-  // otherwise start look on right side
-  if (activeLookId === null){
-    startLook(e.pointerId, x);
-    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  
+  // Иначе — обзор (свайп)
+  if (lookState.activeId === null) {
+    lookState.activeId = e.pointerId;
+    lookState.lastX = x;
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
   }
-});
+}
 
-canvas.addEventListener('pointermove', (e) => {
-  if (e.pointerType === 'mouse') return;
-  if (activeStickId !== null && e.pointerId === activeStickId && stickState.pressed){
-    const x = e.clientX, y = e.clientY;
-    const dx = x - stickState.centerX, dy = y - stickState.centerY, dist = Math.hypot(dx,dy), max = stickState.radius;
-    let kx = x, ky = y;
-    if (dist > max){ kx = stickState.centerX + dx * (max / dist); ky = stickState.centerY + dy * (max / dist); }
-    stickState.knobX = kx; stickState.knobY = ky;
-    movement.forward = computeForwardFromKnob();
-    movement.strafe = computeStrafeFromKnob();
+function onPointerMove(e) {
+  if (isPaused || e.pointerType === 'mouse') return;
+  
+  const x = e.clientX;
+  const y = e.clientY;
+  
+  if (e.pointerId === stickState.activeId && stickState.pressed) {
+    updateStickFromTouch(x, y);
     return;
   }
-  if (activeLookId !== null && e.pointerId === activeLookId){
-    moveLook(e.clientX);
+  
+  if (e.pointerId === lookState.activeId) {
+    const dx = x - lookState.lastX;
+    lookState.lastX = x;
+    const factor = (Math.PI * 0.8) / window.innerWidth;
+    player.angle += dx * factor * settings.sensitivity.look;
     return;
   }
-});
+}
 
-canvas.addEventListener('pointerup', (e) => {
+function onPointerUp(e) {
   if (e.pointerType === 'mouse') return;
-  if (e.pointerId === activeStickId){
-    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-    activeStickId = null; stickState.pressed = false; movement.forward = 0; movement.strafe = 0;
-    stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
+  
+  if (e.pointerId === stickState.activeId) {
+    stickState.activeId = null;
+    stickState.pressed = false;
+    movement.forward = 0;
+    movement.strafe = 0;
+    stickState.knobX = stickState.centerX;
+    stickState.knobY = stickState.centerY;
+    try { canvas.releasePointerCapture(e.pointerId); } catch {}
     return;
   }
-  if (e.pointerId === activeLookId){
-    endLook(e.pointerId);
-    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+  
+  if (e.pointerId === lookState.activeId) {
+    lookState.activeId = null;
+    try { canvas.releasePointerCapture(e.pointerId); } catch {}
   }
-});
-canvas.addEventListener('pointercancel', (e) => {
+}
+
+function onPointerCancel(e) {
   if (e.pointerType === 'mouse') return;
-  if (e.pointerId === activeStickId){
-    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-    activeStickId = null; stickState.pressed = false; movement.forward = 0; movement.strafe = 0;
-    stickState.knobX = stickState.centerX; stickState.knobY = stickState.centerY;
-  }
-  if (e.pointerId === activeLookId) { endLook(e.pointerId); }
-});
-
-/* ===== SETTINGS UI BINDING (preview & pause) ===== */
-const overlay = document.getElementById('settingsOverlay');
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsApply = document.getElementById('settingsApply');
-const settingsClose = document.getElementById('settingsClose');
-const resetDefaultsBtn = document.getElementById('resetDefaults');
-
-const joyScaleInput = document.getElementById('joyScale');
-const joySizeInput  = document.getElementById('joySize');
-const previewStick = document.getElementById('previewStick');
-const previewPad = document.getElementById('joystickPreview');
-
-const previewFire = document.getElementById('previewFire');
-const previewPadFire = document.getElementById('firePreview');
-const fireSizeInput = document.getElementById('fireSize');
-
-const sensMoveInput = document.getElementById('sensMove');
-const sensLookInput = document.getElementById('sensLook');
-const gfxRadios = document.getElementsByName('gfxPreset');
-
-function openSettings(){
-  paused = true;
-  // release any active pointers to avoid zалипание
-  if (activeStickId !== null){ try{ canvas.releasePointerCapture(activeStickId); }catch(_){} activeStickId=null; stickState.pressed=false; movement.forward=0; movement.strafe=0; stickState.knobX=stickState.centerX; stickState.knobY=stickState.centerY; }
-  if (activeLookId !== null){ try{ canvas.releasePointerCapture(activeLookId); }catch(_){} activeLookId=null; }
-  overlay.style.display = 'flex';
-  joyScaleInput.value = settings.joystick.scale;
-  joySizeInput.value = settings.joystick.hitArea;
-  fireSizeInput.value = settings.fire.size;
-  sensMoveInput.value = settings.sensitivity.move;
-  sensLookInput.value = settings.sensitivity.look;
-  for (const r of gfxRadios) r.checked = (r.value === settings.graphics.preset);
-  updatePreviewFromSettings();
-  updateFirePreviewFromSettings();
+  onPointerUp(e);
 }
 
-function closeSettings(apply=false){
-  overlay.style.display = 'none';
-  if (apply){
-    saveSettings();
-    resetStickFromSettings();
-    updateFireButtonPosition();
-    applyGraphicsPreset();
-  }
-  paused = false;
-}
+let firePressed = false;
 
-settingsBtn.addEventListener('click', openSettings);
-settingsClose.addEventListener('click', ()=>closeSettings(false));
-settingsApply.addEventListener('click', ()=>{
-  settings.joystick.scale = parseFloat(joyScaleInput.value);
-  settings.joystick.hitArea = parseFloat(joySizeInput.value);
-  settings.fire.size = parseInt(fireSizeInput.value,10);
-  settings.sensitivity.move = parseFloat(sensMoveInput.value);
-  settings.sensitivity.look = parseFloat(sensLookInput.value);
-  const sel = Array.from(gfxRadios).find(r => r.checked);
-  settings.graphics.preset = sel ? sel.value : settings.graphics.preset;
-  saveSettings();
-  resetStickFromSettings();
-  updateFireButtonPosition();
-  applyGraphicsPreset();
-  closeSettings(true);
-});
-resetDefaultsBtn.addEventListener('click', ()=>{
-  settings = structuredClone(defaultSettings);
-  joyScaleInput.value = settings.joystick.scale;
-  joySizeInput.value = settings.joystick.hitArea;
-  fireSizeInput.value = settings.fire.size;
-  sensMoveInput.value = settings.sensitivity.move;
-  sensLookInput.value = settings.sensitivity.look;
-  updatePreviewFromSettings();
-  updateFirePreviewFromSettings();
-});
-
-/* ===== PREVIEW DRAG: joystick (maps preview pos -> normalized 0..1) ===== */
-let previewDragStick = false;
-previewStick.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; previewDragStick = true; previewStick.setPointerCapture(e.pointerId); });
-window.addEventListener('pointermove', (e) => {
-  if (!previewDragStick) return;
+function onFireDown(e) {
   if (e.pointerType === 'mouse') return;
-  const rect = previewPad.getBoundingClientRect();
-  let lx = e.clientX - rect.left, ly = e.clientY - rect.top;
-  lx = Math.max(12, Math.min(rect.width-12, lx)); ly = Math.max(12, Math.min(rect.height-12, ly));
-  previewStick.style.left = (lx - previewStick.offsetWidth/2) + 'px';
-  previewStick.style.top = (ly - previewStick.offsetHeight/2) + 'px';
-  // map preview (0..1) to full screen normalized coordinates
-  const relX = lx / rect.width;
-  const relY = ly / rect.height;
-  settings.joystick.x_pct = Math.max(0.02, Math.min(0.98, relX)); // normalized to full width
-  settings.joystick.y_pct = Math.max(0.02, Math.min(0.98, relY));
-});
-window.addEventListener('pointerup', (e) => { if (previewDragStick) { previewDragStick = false; try{ previewStick.releasePointerCapture(e.pointerId); }catch(_){} } });
-
-function updatePreviewFromSettings(){
-  const preview = document.getElementById('joystickPreview');
-  const rect = preview.getBoundingClientRect();
-  const px = Math.max(18, Math.min(rect.width-18, settings.joystick.x_pct * rect.width));
-  const py = Math.max(18, Math.min(rect.height-18, settings.joystick.y_pct * rect.height));
-  previewStick.style.left = (px - previewStick.offsetWidth/2) + 'px';
-  previewStick.style.top  = (py - previewStick.offsetHeight/2) + 'px';
-  previewStick.style.transform = `scale(${Math.max(0.6, Math.min(1.6, settings.joystick.scale))})`;
-  joyScaleInput.value = settings.joystick.scale;
-  joySizeInput.value = settings.joystick.hitArea;
+  firePressed = true;
+  try { e.target.setPointerCapture(e.pointerId); } catch {}
+  shoot();
 }
 
-/* ===== PREVIEW DRAG: fire (maps preview pos -> normalized 0..1) ===== */
-let previewDragFire = false;
-previewFire.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; previewDragFire = true; previewFire.setPointerCapture(e.pointerId); });
-window.addEventListener('pointermove', (e) => {
-  if (!previewDragFire) return;
+function onFireUp(e) {
   if (e.pointerType === 'mouse') return;
-  const rect = previewPadFire.getBoundingClientRect();
-  let lx = e.clientX - rect.left, ly = e.clientY - rect.top;
-  lx = Math.max(12, Math.min(rect.width-12, lx)); ly = Math.max(12, Math.min(rect.height-12, ly));
-  previewFire.style.left = (lx - previewFire.offsetWidth/2) + 'px';
-  previewFire.style.top = (ly - previewFire.offsetHeight/2) + 'px';
-  const relX = lx / rect.width;
-  const relY = ly / rect.height;
-  // map preview relX to right-side normalized region (but keep full 0..1 for simplicity)
-  settings.fire.x_pct = Math.max(0.02, Math.min(0.98, relX));
-  settings.fire.y_pct = Math.max(0.02, Math.min(0.98, relY));
-});
-window.addEventListener('pointerup', (e) => { if (previewDragFire) { previewDragFire = false; try{ previewFire.releasePointerCapture(e.pointerId); }catch(_){} } });
-
-function updateFirePreviewFromSettings(){
-  const preview = document.getElementById('firePreview');
-  const rect = preview.getBoundingClientRect();
-  const px = Math.max(18, Math.min(rect.width-18, settings.fire.x_pct * rect.width));
-  const py = Math.max(18, Math.min(rect.height-18, settings.fire.y_pct * rect.height));
-  previewFire.style.left = (px - previewFire.offsetWidth/2) + 'px';
-  previewFire.style.top  = (py - previewFire.offsetHeight/2) + 'px';
-  previewFire.style.width = Math.max(30, Math.min(120, settings.fire.size * 0.6)) + 'px';
-  previewFire.style.height = previewFire.style.width;
-  fireSizeInput.value = settings.fire.size;
+  firePressed = false;
+  try { e.target.releasePointerCapture(e.pointerId); } catch {}
 }
 
-/* live update preview scale */
-joyScaleInput.addEventListener('input', (e) => { previewStick.style.transform = `scale(${e.target.value})`; });
-fireSizeInput.addEventListener('input', (e) => { previewFire.style.width = Math.max(30, Math.min(120, e.target.value*0.6)) + 'px'; previewFire.style.height = previewFire.style.width; });
-
-/* close overlay by tapping outside */
-overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSettings(false); });
-
-/* ===== INITIALIZE ===== */
-function init(){
-  applyGraphicsPreset();
-  window.addEventListener('resize', ()=>{
-    DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-    applyGraphicsPreset();
-    resetStickFromSettings();
-    updatePreviewFromSettings();
-    updateFirePreviewFromSettings();
-    updateFireButtonPosition();
+function shoot() {
+  const now = performance.now();
+  if (now - lastShotTime < shotCooldown * 1000) return;
+  lastShotTime = now;
+  
+  const dir = player.direction;
+  const muzzleDist = 0.35;
+  const bx = player.x + dir.x * muzzleDist;
+  const by = player.y + dir.y * muzzleDist;
+  
+  bullets.push(new Bullet(bx, by, player.angle, 9 + Math.random() * 2));
+  
+  // Визуальный эффект выстрела
+  hitEffects.push({
+    x: canvasWidth / 2,
+    y: canvasHeight / 2,
+    size: Math.min(canvasWidth, canvasHeight) * 0.04,
+    life: 0.08,
+    maxLife: 0.08,
+    type: 'muzzle'
   });
-  updatePreviewFromSettings();
-  updateFirePreviewFromSettings();
-  resetStickFromSettings();
-  updateFireButtonPosition();
-  requestAnimationFrame(loop);
 }
-init();
-applyGraphicsPreset();
-saveSettings();
 
-/* main render wrapper */
-function render(){
-  renderBase();
-  // overlays
-  drawStickOverlay();
+// ============================================================
+//  10. РЕНДЕРИНГ ИГРЫ
+// ============================================================
+
+function renderScene() {
+  renderer.clear();
+  renderer.drawFloorCeiling();
+  
+  const numColumns = settings.graphics.preset === 'ultra' ? Math.floor(canvasWidth * 0.9) :
+                    settings.graphics.preset === 'quality' ? Math.floor(canvasWidth * 0.7) :
+                    Math.floor(canvasWidth * 0.5);
+  
+  const step = player.fov / numColumns;
+  let angle = player.angle - player.fov / 2;
+  
+  for (let i = 0; i < numColumns; i++) {
+    const ray = castRay(player.x, player.y, angle, map);
+    const distance = ray.distance;
+    
+    // Коррекция "рыбьего глаза"
+    const correctedDist = distance * Math.cos(angle - player.angle);
+    
+    // Высота стены на экране
+    const wallHeight = Math.min(canvasHeight * 2, canvasHeight / (correctedDist + 0.01));
+    const yTop = (canvasHeight - wallHeight) / 2;
+    const yBottom = (canvasHeight + wallHeight) / 2;
+    
+    // Затемнение по дистанции
+    const shade = Math.max(0.1, Math.min(1.0, 1.4 - correctedDist * 0.07));
+    
+    const x = Math.floor((i / numColumns) * canvasWidth);
+    renderer.drawColumn(x, yTop, yBottom, shade, ray.side, ray.wallX);
+    
+    angle += step;
+  }
+  
+  // Пули
+  for (const bullet of bullets) {
+    const sp = bullet.screenPos(player, canvasWidth, canvasHeight);
+    if (sp) {
+      const size = Math.max(3, 6 * (1 - Math.min(1, Math.hypot(bullet.x - player.x, bullet.y - player.y) / 15)));
+      const idx = (Math.floor(sp.y) * canvasWidth + Math.floor(sp.x)) * 4;
+      if (idx >= 0 && idx < renderer.data.length - 4) {
+        renderer.data[idx] = 255;
+        renderer.data[idx + 1] = 220;
+        renderer.data[idx + 2] = 100;
+        renderer.data[idx + 3] = 255;
+      }
+    }
+  }
+  
+  // Эффекты попаданий
+  for (let i = hitEffects.length - 1; i >= 0; i--) {
+    const e = hitEffects[i];
+    e.life -= 1 / 60;
+    if (e.life <= 0) {
+      hitEffects.splice(i, 1);
+      continue;
+    }
+    const alpha = e.life / e.maxLife;
+    const size = e.size * (1 + (1 - alpha) * 0.5);
+    const idx = (Math.floor(e.y) * canvasWidth + Math.floor(e.x)) * 4;
+    if (idx >= 0 && idx < renderer.data.length - 4) {
+      renderer.data[idx] = Math.floor(255 * alpha);
+      renderer.data[idx + 1] = Math.floor(200 * alpha);
+      renderer.data[idx + 2] = Math.floor(100 * alpha);
+      renderer.data[idx + 3] = 255;
+    }
+  }
+  
+  // Мини-карта
+  drawMinimap();
+  
+  // Прицел
   drawCrosshair();
-  drawProjectilesAndEffects();
+  
+  renderer.render();
 }
+
+// ============================================================
+//  11. МИНИ-КАРТА
+// ============================================================
+
+function drawMinimap() {
+  const size = Math.min(160, canvasWidth * 0.16);
+  const pad = 12;
+  const x = canvasWidth - size - pad;
+  const y = pad;
+  const cell = (size - 4) / map.size;
+  
+  // Фон
+  const baseIdx = (Math.floor(y) * canvasWidth + Math.floor(x)) * 4;
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const idx = ((Math.floor(y) + j) * canvasWidth + (Math.floor(x) + i)) * 4;
+      if (idx >= 0 && idx < renderer.data.length - 4) {
+        renderer.data[idx] = 10;
+        renderer.data[idx + 1] = 12;
+        renderer.data[idx + 2] = 16;
+        renderer.data[idx + 3] = 220;
+      }
+    }
+  }
+  
+  // Стены
+  for (let my = 0; my < map.size; my++) {
+    for (let mx = 0; mx < map.size; mx++) {
+      if (map.isWall(mx + 0.5, my + 0.5)) {
+        const px = Math.floor(x + 2 + mx * cell);
+        const py = Math.floor(y + 2 + my * cell);
+        const w = Math.ceil(cell);
+        const h = Math.ceil(cell);
+        for (let j = 0; j < h; j++) {
+          for (let i = 0; i < w; i++) {
+            const idx = ((py + j) * canvasWidth + (px + i)) * 4;
+            if (idx >= 0 && idx < renderer.data.length - 4) {
+              renderer.data[idx] = 160;
+              renderer.data[idx + 1] = 160;
+              renderer.data[idx + 2] = 160;
+              renderer.data[idx + 3] = 200;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Игрок
+  const px = Math.floor(x + 2 + player.x * cell);
+  const py = Math.floor(y + 2 + player.y * cell);
+  const pr = Math.max(2, cell * 0.4);
+  for (let j = -pr; j <= pr; j++) {
+    for (let i = -pr; i <= pr; i++) {
+      if (Math.hypot(i, j) > pr) continue;
+      const idx = ((py + j) * canvasWidth + (px + i)) * 4;
+      if (idx >= 0 && idx < renderer.data.length - 4) {
+        renderer.data[idx] = 255;
+        renderer.data[idx + 1] = 230;
+        renderer.data[idx + 2] = 50;
+        renderer.data[idx + 3] = 255;
+      }
+    }
+  }
+  
+  // Направление взгляда
+  const dirLen = cell * 1.2;
+  const endX = px + Math.cos(player.angle) * dirLen;
+  const endY = py + Math.sin(player.angle) * dirLen;
+  for (let t = 0; t < 1; t += 0.02) {
+    const lx = Math.floor(px + (endX - px) * t);
+    const ly = Math.floor(py + (endY - py) * t);
+    const idx = (ly * canvasWidth + lx) * 4;
+    if (idx >= 0 && idx < renderer.data.length - 4) {
+      renderer.data[idx] = 255;
+      renderer.data[idx + 1] = 200;
+      renderer.data[idx + 2] = 80;
+      renderer.data[idx + 3] = 255;
+    }
+  }
+}
+
+// ============================================================
+//  12. ПРИЦЕЛ
+// ============================================================
+
+function drawCrosshair() {
+  const cx = canvasWidth / 2;
+  const cy = canvasHeight / 2;
+  const size = Math.max(10, canvasWidth * 0.025);
+  const gap = Math.max(4, size * 0.3);
+  const thickness = Math.max(1.5, canvasWidth * 0.003);
+  
+  const color = [200, 240, 255];
+  
+  const drawLine = (x1, y1, x2, y2) => {
+    const steps = Math.max(1, Math.hypot(x2 - x1, y2 - y1));
+    for (let t = 0; t <= 1; t += 1 / steps) {
+      const lx = Math.floor(x1 + (x2 - x1) * t);
+      const ly = Math.floor(y1 + (y2 - y1) * t);
+      const idx = (ly * canvasWidth + lx) * 4;
+      if (idx >= 0 && idx < renderer.data.length - 4) {
+        renderer.data[idx] = color[0];
+        renderer.data[idx + 1] = color[1];
+        renderer.data[idx + 2] = color[2];
+        renderer.data[idx + 3] = 220;
+      }
+    }
+  };
+  
+  // Четыре линии прицела
+  const segments = [
+    [-size, 0, -gap, 0],
+    [gap, 0, size, 0],
+    [0, -size, 0, -gap],
+    [0, gap, 0, size]
+  ];
+  
+  for (const [x1, y1, x2, y2] of segments) {
+    const s = thickness;
+    for (let t = 0; t < s; t += 0.5) {
+      const offset = t - s / 2;
+      drawLine(cx + x1 + offset, cy + y1, cx + x2 + offset, cy + y2);
+      drawLine(cx + x1, cy + y1 + offset, cx + x2, cy + y2 + offset);
+    }
+  }
+}
+
+// ============================================================
+//  13. ОБНОВЛЕНИЕ ИГРЫ
+// ============================================================
+
+function update(dt) {
+  // Движение
+  const moveSpeed = player.moveSpeed * settings.sensitivity.move;
+  const turnSpeed = player.turnSpeed * settings.sensitivity.look;
+  
+  const forward = movement.forward * moveSpeed * dt;
+  const strafe = movement.strafe * moveSpeed * dt * 0.8;
+  
+  if (forward !== 0 || strafe !== 0) {
+    const angle = player.angle;
+    const dx = Math.cos(angle) * forward - Math.sin(angle) * strafe;
+    const dy = Math.sin(angle) * forward + Math.cos(angle) * strafe;
+    player.move(dx, dy, map);
+  }
+  
+  // Поворот от свайпа
+  if (movement.turn !== 0) {
+    player.angle += movement.turn * turnSpeed * dt;
+  }
+  
+  // Пули
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].update(dt, map);
+    if (!bullets[i].alive) {
+      // Эффект попадания в стену
+      const sp = bullets[i].screenPos(player, canvasWidth, canvasHeight);
+      if (sp) {
+        hitEffects.push({
+          x: sp.x,
+          y: sp.y,
+          size: Math.min(canvasWidth, canvasHeight) * 0.02,
+          life: 0.2,
+          maxLife: 0.2,
+          type: 'hit'
+        });
+      }
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ============================================================
+//  14. ГЛАВНЫЙ ЦИКЛ
+// ============================================================
+
+function gameLoop(timestamp) {
+  if (!lastFrameTime) lastFrameTime = timestamp;
+  const dt = Math.min(0.05, (timestamp - lastFrameTime) / 1000);
+  lastFrameTime = timestamp;
+  
+  if (!isPaused) {
+    update(dt);
+    renderScene();
+  }
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+//  15. НАСТРОЙКИ UI
+// ============================================================
+
+function setupSettingsUI() {
+  const overlay = document.getElementById('settingsOverlay');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const closeBtn = document.getElementById('settingsClose');
+  const applyBtn = document.getElementById('settingsApply');
+  const resetBtn = document.getElementById('resetDefaults');
+  
+  const joyScale = document.getElementById('joyScale');
+  const joySize = document.getElementById('joySize');
+  const fireSize = document.getElementById('fireSize');
+  const sensMove = document.getElementById('sensMove');
+  const sensLook = document.getElementById('sensLook');
+  const gfxRadios = document.getElementsByName('gfxPreset');
+  
+  function openSettings() {
+    isPaused = true;
+    overlay.style.display = 'flex';
+    
+    joyScale.value = settings.joystick.scale;
+    joySize.value = settings.joystick.hitArea;
+    fireSize.value = settings.fire.size;
+    sensMove.value = settings.sensitivity.move;
+    sensLook.value = settings.sensitivity.look;
+    
+    for (const r of gfxRadios) {
+      r.checked = r.value === settings.graphics.preset;
+    }
+    
+    updatePreviewStick();
+    updatePreviewFire();
+  }
+  
+  function closeSettings(apply = false) {
+    overlay.style.display = 'none';
+    if (apply) {
+      saveSettings();
+      resetStick();
+      updateFireButton();
+      resizeCanvas();
+    }
+    isPaused = false;
+  }
+  
+  settingsBtn.addEventListener('click', openSettings);
+  closeBtn.addEventListener('click', () => closeSettings(false));
+  
+  applyBtn.addEventListener('click', () => {
+    settings.joystick.scale = parseFloat(joyScale.value);
+    settings.joystick.hitArea = parseFloat(joySize.value);
+    settings.fire.size = parseInt(fireSize.value, 10);
+    settings.sensitivity.move = parseFloat(sensMove.value);
+    settings.sensitivity.look = parseFloat(sensLook.value);
+    
+    const sel = Array.from(gfxRadios).find(r => r.checked);
+    if (sel) settings.graphics.preset = sel.value;
+    
+    closeSettings(true);
+  });
+  
+  resetBtn.addEventListener('click', () => {
+    settings = structuredClone(defaultSettings);
+    joyScale.value = settings.joystick.scale;
+    joySize.value = settings.joystick.hitArea;
+    fireSize.value = settings.fire.size;
+    sensMove.value = settings.sensitivity.move;
+    sensLook.value = settings.sensitivity.look;
+    updatePreviewStick();
+    updatePreviewFire();
+  });
+  
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSettings(false);
+  });
+  
+  // Превью джойстика
+  const previewStick = document.getElementById('previewStick');
+  const previewPad = document.getElementById('previewPad');
+  
+  let isDraggingStick = false;
+  previewStick.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    isDraggingStick = true;
+    previewStick.setPointerCapture(e.pointerId);
+  });
+  
+  window.addEventListener('pointermove', (e) => {
+    if (!isDraggingStick || e.pointerType === 'mouse') return;
+    const rect = previewPad.getBoundingClientRect();
+    let lx = e.clientX - rect.left;
+    let ly = e.clientY - rect.top;
+    lx = Math.max(10, Math.min(rect.width - 10, lx));
+    ly = Math.max(10, Math.min(rect.height - 10, ly));
+    previewStick.style.left = (lx - previewStick.offsetWidth / 2) + 'px';
+    previewStick.style.top = (ly - previewStick.offsetHeight / 2) + 'px';
+    
+    settings.joystick.x_pct = Math.max(0.02, Math.min(0.98, lx / rect.width));
+    settings.joystick.y_pct = Math.max(0.02, Math.min(0.98, ly / rect.height));
+  });
+  
+  window.addEventListener('pointerup', (e) => {
+    if (isDraggingStick) {
+      isDraggingStick = false;
+      try { previewStick.releasePointerCapture(e.pointerId); } catch {}
+    }
+  });
+  
+  // Превью кнопки огня
+  const previewFire = document.getElementById('previewFire');
+  const previewPadFire = document.getElementById('previewPadFire');
+  
+  let isDraggingFire = false;
+  previewFire.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    isDraggingFire = true;
+    previewFire.setPointerCapture(e.pointerId);
+  });
+  
+  window.addEventListener('pointermove', (e) => {
+    if (!isDraggingFire || e.pointerType === 'mouse') return;
+    const rect = previewPadFire.getBoundingClientRect();
+    let lx = e.clientX - rect.left;
+    let ly = e.clientY - rect.top;
+    lx = Math.max(10, Math.min(rect.width - 10, lx));
+    ly = Math.max(10, Math.min(rect.height - 10, ly));
+    previewFire.style.left = (lx - previewFire.offsetWidth / 2) + 'px';
+    previewFire.style.top = (ly - previewFire.offsetHeight / 2) + 'px';
+    
+    settings.fire.x_pct = Math.max(0.02, Math.min(0.98, lx / rect.width));
+    settings.fire.y_pct = Math.max(0.02, Math.min(0.98, ly / rect.height));
+  });
+  
+  window.addEventListener('pointerup', (e) => {
+    if (isDraggingFire) {
+      isDraggingFire = false;
+      try { previewFire.releasePointerCapture(e.pointerId); } catch {}
+    }
+  });
+  
+  // Live preview слайдеров
+  joyScale.addEventListener('input', (e) => {
+    previewStick.style.transform = `scale(${e.target.value})`;
+  });
+  
+  fireSize.addEventListener('input', (e) => {
+    const size = Math.max(30, Math.min(120, e.target.value * 0.6));
+    previewFire.style.width = size + 'px';
+    previewFire.style.height = size + 'px';
+  });
+  
+  function updatePreviewStick() {
+    const rect = previewPad.getBoundingClientRect();
+    const px = Math.max(10, Math.min(rect.width - 10, settings.joystick.x_pct * rect.width));
+    const py = Math.max(10, Math.min(rect.height - 10, settings.joystick.y_pct * rect.height));
+    previewStick.style.left = (px - previewStick.offsetWidth / 2) + 'px';
+    previewStick.style.top = (py - previewStick.offsetHeight / 2) + 'px';
+    previewStick.style.transform = `scale(${settings.joystick.scale})`;
+  }
+  
+  function updatePreviewFire() {
+    const rect = previewPadFire.getBoundingClientRect();
+    const px = Math.max(10, Math.min(rect.width - 10, settings.fire.x_pct * rect.width));
+    const py = Math.max(10, Math.min(rect.height - 10, settings.fire.y_pct * rect.height));
+    const size = Math.max(30, Math.min(120, settings.fire.size * 0.6));
+    previewFire.style.width = size + 'px';
+    previewFire.style.height = size + 'px';
+    previewFire.style.left = (px - size / 2) + 'px';
+    previewFire.style.top = (py - size / 2) + 'px';
+  }
+}
+
+// ============================================================
+//  16. КНОПКА ОГНЯ (DOM)
+// ============================================================
+
+function updateFireButton() {
+  const btn = document.getElementById('fireBtn');
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const size = Math.max(40, Math.min(140, settings.fire.size));
+  const px = Math.round(Math.max(0.04, Math.min(0.96, settings.fire.x_pct)) * w);
+  const py = Math.round(Math.max(0.04, Math.min(0.96, settings.fire.y_pct)) * h);
+  
+  btn.style.width = size + 'px';
+  btn.style.height = size + 'px';
+  btn.style.left = (px - size / 2) + 'px';
+  btn.style.top = (py - size / 2) + 'px';
+  btn.style.fontSize = Math.max(20, size * 0.45) + 'px';
+}
+
+// ============================================================
+//  17. РАЗМЕР CANVAS
+// ============================================================
+
+function resizeCanvas() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  
+  DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  const qualityFactor = settings.graphics.preset === 'ultra' ? 1.2 :
+                        settings.graphics.preset === 'quality' ? 1.0 : 0.7;
+  
+  canvasWidth = Math.max(300, Math.floor(w * DPR * qualityFactor));
+  canvasHeight = Math.max(200, Math.floor(h * DPR * qualityFactor));
+  
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  
+  renderer.init();
+}
+
+// ============================================================
+//  18. ИНИЦИАЛИЗАЦИЯ
+// ============================================================
+
+function init() {
+  resizeCanvas();
+  resetStick();
+  updateFireButton();
+  setupInput();
+  setupSettingsUI();
+  
+  // Обработка ресайза
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    resetStick();
+    updateFireButton();
+  });
+  
+  // Старт цикла
+  requestAnimationFrame(gameLoop);
+}
+
+init();
+
+console.log('🔥 Shuterok Engine v4 загружен!');
+console.log(`📐 Размер: ${canvasWidth}x${canvasHeight}`);
+console.log(`🗺️ Карта: ${map.size}x${map.size}`);
+console.log(`🎯 FOV: ${(player.fov * 180 / Math.PI).toFixed(1)}°`);
 </script>
 </body>
 </html>
- 
